@@ -145,6 +145,7 @@ function formatElapsedSince(ts: number, base: number | null | undefined) {
 }
 
 const activityBodyRef = createRef<HTMLElement>();
+const avatarPreviewDialogRef = createRef<HTMLDialogElement>();
 
 type ActivityLevel = "info" | "warn" | "error";
 
@@ -258,6 +259,127 @@ function renderActivityPanel(props: ChatProps) {
     props.onActivityLockChange?.(!atBottom);
   };
 
+  const promptAvatarUpload = (storageKey: string) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const url = String(reader.result ?? "");
+        if (!url.startsWith("data:image/")) {
+          window.alert("Avatar upload failed: unsupported image format.");
+          return;
+        }
+        try {
+          localStorage.setItem(storageKey, url);
+          const saved = localStorage.getItem(storageKey);
+          if (!saved || saved.length < 20) {
+            window.alert("Avatar upload failed: could not persist to local storage.");
+            return;
+          }
+          window.location.reload();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err ?? "unknown error");
+          window.alert(
+            `Avatar upload failed (likely storage quota). Try a smaller PNG/JPG.\n\n${msg}`,
+          );
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  };
+
+  const clearAvatarOverride = (storageKey: string) => {
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {
+      // ignore
+    }
+    window.location.reload();
+  };
+
+  const getAvatarOverrideUrl = (storageKey: string): string | null => {
+    try {
+      const v = localStorage.getItem(storageKey);
+      return typeof v === "string" && v.trim().startsWith("data:image/") ? v.trim() : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const showAvatarPreview = (label: string, url: string) => {
+    const dlg = avatarPreviewDialogRef.value;
+    if (!dlg) return;
+    const img = dlg.querySelector('img[data-role="avatar-preview"]') as HTMLImageElement | null;
+    const title = dlg.querySelector('[data-role="avatar-title"]') as HTMLElement | null;
+    if (img) img.src = url;
+    if (title) title.textContent = label;
+    try {
+      dlg.showModal();
+    } catch {
+      // Fallback for older browsers
+      dlg.setAttribute('open', '');
+    }
+  };
+
+  type AvatarStatusType =
+    | "idle"
+    | "thinking"
+    | "answer"
+    | "tool"
+    | "searching"
+    | "disconnected";
+
+  const resolveAvatarStatusType = (): AvatarStatusType => {
+    if (!props.connected) return "disconnected";
+    const running = Boolean(props.canAbort || props.sending || props.stream);
+    if (!running) return "idle";
+
+    // Prefer the most recent activity log subsystem/event when available.
+    const log = Array.isArray(props.activityLog) ? props.activityLog : [];
+    const last = log.length ? (log[log.length - 1] as any) : null;
+    const subsystem = String(last?.subsystem ?? last?.tag ?? "").toLowerCase();
+    const event = String(last?.event ?? "").toLowerCase();
+    const text = String(last?.text ?? "").toLowerCase();
+
+    // Search detection: (1) explicit activity subsystem/event/text AND (2) known search/browse tool names.
+    const looksLikeSearchByActivity =
+      subsystem === "search" ||
+      event.includes("search") ||
+      text.includes("search") ||
+      text.includes("brows") ||
+      text.includes("retriev");
+
+    const looksLikeSearchByToolName = (() => {
+      if (subsystem !== "tool") return false;
+      // Activity tool lines are formatted like: "<ToolLabel> (<detail>) :: ..."
+      // Catch common web/browse/search tools.
+      const hay = `${event} ${text}`;
+      return (
+        hay.includes("web search") ||
+        hay.includes("web_search") ||
+        hay.includes("web fetch") ||
+        hay.includes("web_fetch") ||
+        hay.includes("browser") ||
+        hay.includes("snapshot") ||
+        hay.includes("screenshot") ||
+        hay.includes("navigate")
+      );
+    })();
+
+    if (looksLikeSearchByActivity || looksLikeSearchByToolName) return "searching";
+    if (subsystem === "tool") return "tool";
+
+    const streamText = String(props.stream ?? "");
+    return streamText && streamText.length > 0 ? "answer" : "thinking";
+  };
+
+  const avatarStatusType = resolveAvatarStatusType();
+
   return html`
     <aside
       class="chat-activity"
@@ -339,10 +461,171 @@ function renderActivityPanel(props: ChatProps) {
                 `,
               )}
             </div>
+
+            <div class="chat-activity__avatar" aria-label="Avatar">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px">
+                <div style="display:flex; align-items:center; gap:8px">
+                  <div style="font-size: 12px; font-weight: 600; opacity: 0.9">Avatar</div>
+                  <span class="pill" style="padding: 2px 8px; font-size: 11px">${avatarStatusType.toUpperCase()}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px">
+                  <div class="muted" style="font-size: 11px">profile by status</div>
+                  <button class="btn btn--xs" type="button" title="Clear all avatar overrides" @click=${() => {
+                    try {
+                      localStorage.removeItem('clawdbot.control.avatar.override.v1');
+                      localStorage.removeItem('clawdbot.control.avatar.override.status.idle.v1');
+                      localStorage.removeItem('clawdbot.control.avatar.override.thinking.v1');
+                      localStorage.removeItem('clawdbot.control.avatar.override.status.answer.v1');
+                      localStorage.removeItem('clawdbot.control.avatar.override.status.tool.v1');
+                      localStorage.removeItem('clawdbot.control.avatar.override.status.searching.v1');
+                      localStorage.removeItem('clawdbot.control.avatar.override.status.disconnected.v1');
+                    } catch {
+                      // ignore
+                    }
+                    window.location.reload();
+                  }}>Clear all</button>
+                </div>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:6px">
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+                  <button class="btn btn--xs" type="button" aria-current=${avatarStatusType === 'idle' ? 'true' : 'false'} title="Set default avatar (fallback)" @click=${() => promptAvatarUpload('clawdbot.control.avatar.override.v1')}>Default</button>
+                  <button class="btn btn--xs" type="button" title="Clear default avatar override" @click=${() => clearAvatarOverride('clawdbot.control.avatar.override.v1')}>Clear</button>
+                  <button
+                    class="avatar-indicator"
+                    type="button"
+                    title="Preview"
+                    aria-label="Preview Default avatar"
+                    ?disabled=${!getAvatarOverrideUrl('clawdbot.control.avatar.override.v1')}
+                    @click=${() => {
+                      const url = getAvatarOverrideUrl('clawdbot.control.avatar.override.v1');
+                      if (url) showAvatarPreview('Default', url);
+                    }}
+                  >${getAvatarOverrideUrl('clawdbot.control.avatar.override.v1') ? icons.check : icons.circle}</button>
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+                  <button class="btn btn--xs chat-avatar-btn ${avatarStatusType === 'idle' ? 'is-active' : ''}" type="button" aria-current=${avatarStatusType === 'idle' ? 'true' : 'false'} title="Set avatar for idle" @click=${() => promptAvatarUpload('clawdbot.control.avatar.override.status.idle.v1')}>Idle</button>
+                  <button class="btn btn--xs" type="button" title="Clear idle avatar override" @click=${() => clearAvatarOverride('clawdbot.control.avatar.override.status.idle.v1')}>Clear</button>
+                  <button
+                    class="avatar-indicator"
+                    type="button"
+                    title="Preview"
+                    aria-label="Preview Idle avatar"
+                    ?disabled=${!getAvatarOverrideUrl('clawdbot.control.avatar.override.status.idle.v1')}
+                    @click=${() => {
+                      const url = getAvatarOverrideUrl('clawdbot.control.avatar.override.status.idle.v1');
+                      if (url) showAvatarPreview('Idle', url);
+                    }}
+                  >${getAvatarOverrideUrl('clawdbot.control.avatar.override.status.idle.v1') ? icons.check : icons.circle}</button>
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+                  <button class="btn btn--xs chat-avatar-btn ${avatarStatusType === 'thinking' ? 'is-active' : ''}" type="button" aria-current=${avatarStatusType === 'thinking' ? 'true' : 'false'} title="Set avatar for thinking" @click=${() => promptAvatarUpload('clawdbot.control.avatar.override.thinking.v1')}>Thinking</button>
+                  <button class="btn btn--xs" type="button" title="Clear thinking avatar override" @click=${() => clearAvatarOverride('clawdbot.control.avatar.override.thinking.v1')}>Clear</button>
+                  <button
+                    class="avatar-indicator"
+                    type="button"
+                    title="Preview"
+                    aria-label="Preview Thinking avatar"
+                    ?disabled=${!getAvatarOverrideUrl('clawdbot.control.avatar.override.thinking.v1')}
+                    @click=${() => {
+                      const url = getAvatarOverrideUrl('clawdbot.control.avatar.override.thinking.v1');
+                      if (url) showAvatarPreview('Thinking', url);
+                    }}
+                  >${getAvatarOverrideUrl('clawdbot.control.avatar.override.thinking.v1') ? icons.check : icons.circle}</button>
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+                  <button class="btn btn--xs chat-avatar-btn ${avatarStatusType === 'answer' ? 'is-active' : ''}" type="button" aria-current=${avatarStatusType === 'answer' ? 'true' : 'false'} title="Set avatar for answer/streaming" @click=${() => promptAvatarUpload('clawdbot.control.avatar.override.status.answer.v1')}>Answer</button>
+                  <button class="btn btn--xs" type="button" title="Clear answer avatar override" @click=${() => clearAvatarOverride('clawdbot.control.avatar.override.status.answer.v1')}>Clear</button>
+                  <button
+                    class="avatar-indicator"
+                    type="button"
+                    title="Preview"
+                    aria-label="Preview Answer avatar"
+                    ?disabled=${!getAvatarOverrideUrl('clawdbot.control.avatar.override.status.answer.v1')}
+                    @click=${() => {
+                      const url = getAvatarOverrideUrl('clawdbot.control.avatar.override.status.answer.v1');
+                      if (url) showAvatarPreview('Answer', url);
+                    }}
+                  >${getAvatarOverrideUrl('clawdbot.control.avatar.override.status.answer.v1') ? icons.check : icons.circle}</button>
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+                  <button class="btn btn--xs chat-avatar-btn ${avatarStatusType === 'tool' ? 'is-active' : ''}" type="button" aria-current=${avatarStatusType === 'tool' ? 'true' : 'false'} title="Set avatar for tool usage" @click=${() => promptAvatarUpload('clawdbot.control.avatar.override.status.tool.v1')}>Tool</button>
+                  <button class="btn btn--xs" type="button" title="Clear tool avatar override" @click=${() => clearAvatarOverride('clawdbot.control.avatar.override.status.tool.v1')}>Clear</button>
+                  <button
+                    class="avatar-indicator"
+                    type="button"
+                    title="Preview"
+                    aria-label="Preview Tool avatar"
+                    ?disabled=${!getAvatarOverrideUrl('clawdbot.control.avatar.override.status.tool.v1')}
+                    @click=${() => {
+                      const url = getAvatarOverrideUrl('clawdbot.control.avatar.override.status.tool.v1');
+                      if (url) showAvatarPreview('Tool', url);
+                    }}
+                  >${getAvatarOverrideUrl('clawdbot.control.avatar.override.status.tool.v1') ? icons.check : icons.circle}</button>
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+                  <button class="btn btn--xs chat-avatar-btn ${avatarStatusType === 'searching' ? 'is-active' : ''}" type="button" aria-current=${avatarStatusType === 'searching' ? 'true' : 'false'} title="Set avatar for searching/browsing" @click=${() => promptAvatarUpload('clawdbot.control.avatar.override.status.searching.v1')}>Searching</button>
+                  <button class="btn btn--xs" type="button" title="Clear searching avatar override" @click=${() => clearAvatarOverride('clawdbot.control.avatar.override.status.searching.v1')}>Clear</button>
+                  <button
+                    class="avatar-indicator"
+                    type="button"
+                    title="Preview"
+                    aria-label="Preview Searching avatar"
+                    ?disabled=${!getAvatarOverrideUrl('clawdbot.control.avatar.override.status.searching.v1')}
+                    @click=${() => {
+                      const url = getAvatarOverrideUrl('clawdbot.control.avatar.override.status.searching.v1');
+                      if (url) showAvatarPreview('Searching', url);
+                    }}
+                  >${getAvatarOverrideUrl('clawdbot.control.avatar.override.status.searching.v1') ? icons.check : icons.circle}</button>
+                </div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center">
+                  <button class="btn btn--xs chat-avatar-btn ${avatarStatusType === 'disconnected' ? 'is-active' : ''}" type="button" aria-current=${avatarStatusType === 'disconnected' ? 'true' : 'false'} title="Set avatar for disconnected" @click=${() => promptAvatarUpload('clawdbot.control.avatar.override.status.disconnected.v1')}>Offline</button>
+                  <button class="btn btn--xs" type="button" title="Clear offline avatar override" @click=${() => clearAvatarOverride('clawdbot.control.avatar.override.status.disconnected.v1')}>Clear</button>
+                  <button
+                    class="avatar-indicator"
+                    type="button"
+                    title="Preview"
+                    aria-label="Preview Offline avatar"
+                    ?disabled=${!getAvatarOverrideUrl('clawdbot.control.avatar.override.status.disconnected.v1')}
+                    @click=${() => {
+                      const url = getAvatarOverrideUrl('clawdbot.control.avatar.override.status.disconnected.v1');
+                      if (url) showAvatarPreview('Offline', url);
+                    }}
+                  >${getAvatarOverrideUrl('clawdbot.control.avatar.override.status.disconnected.v1') ? icons.check : icons.circle}</button>
+                </div>
+              </div>
+            </div>
           `
         : html`
             <div class="muted" style="font-size: 12px">(hidden)</div>
           `}
+
+
+      <dialog class="avatar-preview-dialog" ${ref(avatarPreviewDialogRef)} @click=${(e: MouseEvent) => {
+        const dlg = avatarPreviewDialogRef.value;
+        if (!dlg) return;
+        // Close when clicking the backdrop
+        if (e.target === dlg) dlg.close();
+      }}>
+        <div class="avatar-preview-dialog__panel">
+          <div class="avatar-preview-dialog__header">
+            <div class="avatar-preview-dialog__title" data-role="avatar-title">Avatar</div>
+            <button class="btn btn--xs" type="button" @click=${() => avatarPreviewDialogRef.value?.close()} aria-label="Close">
+              ${icons.x}
+            </button>
+          </div>
+          <div class="avatar-preview-dialog__body">
+            <img data-role="avatar-preview" alt="Avatar preview" />
+          </div>
+        </div>
+      </dialog>
+
     </aside>
   `;
 }
@@ -631,18 +914,70 @@ export function renderChat(props: ChatProps) {
     avatar: props.assistantAvatarUrl ?? props.assistantAvatar ?? null,
   };
 
-  // Optional separate avatar while "thinking" (reading indicator / streaming).
-  let assistantThinkingAvatar: string | null = null;
-  try {
-    const v = localStorage.getItem("clawdbot.control.avatar.override.thinking.v1");
-    assistantThinkingAvatar = typeof v === "string" && v.trim() ? v.trim() : null;
-  } catch {
-    assistantThinkingAvatar = null;
-  }
+  type AvatarStatusType =
+    | "idle"
+    | "thinking"
+    | "answer"
+    | "tool"
+    | "searching"
+    | "disconnected";
 
-  const assistantThinkingIdentity = {
+  const resolveAvatarStatusType = (): AvatarStatusType => {
+    if (!props.connected) return "disconnected";
+    const running = Boolean(props.canAbort || props.sending || props.stream);
+    if (!running) return "idle";
+
+    const log = Array.isArray(props.activityLog) ? props.activityLog : [];
+    const last = log.length ? (log[log.length - 1] as any) : null;
+    const subsystem = String(last?.subsystem ?? last?.tag ?? "").toLowerCase();
+    const event = String(last?.event ?? "").toLowerCase();
+    const text = String(last?.text ?? "").toLowerCase();
+
+    const looksLikeSearch =
+      subsystem === "search" ||
+      event.includes("search") ||
+      text.includes("search") ||
+      text.includes("brows") ||
+      text.includes("retriev");
+
+    if (looksLikeSearch) return "searching";
+    if (subsystem === "tool") return "tool";
+
+    const streamText = String(props.stream ?? "");
+    return streamText && streamText.length > 0 ? "answer" : "thinking";
+  };
+
+  const loadAvatarOverride = (key: string): string | null => {
+    try {
+      const v = localStorage.getItem(key);
+      return typeof v === "string" && v.trim() ? v.trim() : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Default avatar override (answer) (local UI only)
+  const defaultAvatarOverride = loadAvatarOverride("clawdbot.control.avatar.override.v1");
+
+  // Status-based avatar overrides (local UI only).
+  // Back-compat: thinking uses the old dedicated key.
+  const statusType = resolveAvatarStatusType();
+  const statusAvatarOverride = (() => {
+    if (statusType === "thinking") {
+      return loadAvatarOverride("clawdbot.control.avatar.override.thinking.v1");
+    }
+    if (statusType === "tool") {
+      return loadAvatarOverride("clawdbot.control.avatar.override.status.tool.v1");
+    }
+    if (statusType === "searching") {
+      return loadAvatarOverride("clawdbot.control.avatar.override.status.searching.v1");
+    }
+    return loadAvatarOverride(`clawdbot.control.avatar.override.status.${statusType}.v1`);
+  })();
+
+  const assistantStatusIdentity = {
     name: props.assistantName,
-    avatar: assistantThinkingAvatar ?? assistantIdentity.avatar,
+    avatar: statusAvatarOverride ?? defaultAvatarOverride ?? assistantIdentity.avatar,
   };
 
   const hasAttachments = (props.attachments?.length ?? 0) > 0;
@@ -838,7 +1173,7 @@ export function renderChat(props: ChatProps) {
         ${props.loading ? html`<div class="muted">Loading chat…</div>` : nothing}
         ${repeat(chatItems, (item) => item.key, (item) => {
           if (item.kind === "reading-indicator") {
-            return renderReadingIndicatorGroup(assistantThinkingIdentity);
+            return renderReadingIndicatorGroup(assistantStatusIdentity);
           }
 
           if (item.kind === "stream") {
@@ -846,7 +1181,7 @@ export function renderChat(props: ChatProps) {
               item.text,
               item.startedAt,
               props.onOpenSidebar,
-              assistantThinkingIdentity,
+              assistantStatusIdentity,
             );
           }
 
@@ -865,7 +1200,7 @@ export function renderChat(props: ChatProps) {
         })}
 
         ${props.sending && props.stream === null
-          ? renderReadingIndicatorGroup(assistantThinkingIdentity)
+          ? renderReadingIndicatorGroup(assistantStatusIdentity)
           : nothing}
         </div>
       </div>
@@ -1143,99 +1478,6 @@ export function renderChat(props: ChatProps) {
               @click=${canAbort ? props.onAbort : props.onNewSession}
             >
               ${canAbort ? "Stop" : "New session"}
-            </button>
-
-            <button
-              class="btn"
-              type="button"
-              title="Set assistant avatar (answer) (local UI only)"
-              @click=${async () => {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.accept = "image/*";
-                input.onchange = () => {
-                  const file = input.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const url = String(reader.result ?? "");
-                    if (!url.startsWith("data:image/")) {
-                      window.alert("Avatar upload failed: unsupported image format.");
-                      return;
-                    }
-
-                    try {
-                      localStorage.setItem("clawdbot.control.avatar.override.v1", url);
-                      const saved = localStorage.getItem(
-                        "clawdbot.control.avatar.override.v1",
-                      );
-                      if (!saved || saved.length < 20) {
-                        window.alert("Avatar upload failed: could not persist to local storage.");
-                        return;
-                      }
-                      window.location.reload();
-                    } catch (err) {
-                      const msg =
-                        err instanceof Error ? err.message : String(err ?? "unknown error");
-                      window.alert(
-                        `Avatar upload failed (likely storage quota). Try a smaller PNG/JPG.\n\n${msg}`,
-                      );
-                    }
-                  };
-                  reader.readAsDataURL(file);
-                };
-                input.click();
-              }}
-            >
-              Avatar
-            </button>
-
-            <button
-              class="btn"
-              type="button"
-              title="Set assistant avatar (thinking) (local UI only)"
-              @click=${async () => {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.accept = "image/*";
-                input.onchange = () => {
-                  const file = input.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const url = String(reader.result ?? "");
-                    if (!url.startsWith("data:image/")) {
-                      window.alert("Avatar upload failed: unsupported image format.");
-                      return;
-                    }
-
-                    try {
-                      localStorage.setItem(
-                        "clawdbot.control.avatar.override.thinking.v1",
-                        url,
-                      );
-                      const saved = localStorage.getItem(
-                        "clawdbot.control.avatar.override.thinking.v1",
-                      );
-                      if (!saved || saved.length < 20) {
-                        window.alert("Avatar upload failed: could not persist to local storage.");
-                        return;
-                      }
-                      window.location.reload();
-                    } catch (err) {
-                      const msg =
-                        err instanceof Error ? err.message : String(err ?? "unknown error");
-                      window.alert(
-                        `Avatar upload failed (likely storage quota). Try a smaller PNG/JPG.\n\n${msg}`,
-                      );
-                    }
-                  };
-                  reader.readAsDataURL(file);
-                };
-                input.click();
-              }}
-            >
-              Thinking
             </button>
 
             <button

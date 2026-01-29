@@ -7,15 +7,19 @@
   position: sticky;
   top: 12px;
   align-self: start;
-  /* Avoid being covered by the sticky compose bar */
+
+  /* Fixed sidebar height. Children (Activity/Avatar) take a 60/40 split. */
+  height: calc(100vh - 240px);
   max-height: calc(100vh - 240px);
 
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--panel);
   padding: 10px;
-  padding-bottom: 100px;
 }
 
 .chat-activity__header {
@@ -40,6 +44,10 @@
 }
 
 .chat-activity__body {
+  /* 60% of remaining sidebar height (header excluded) */
+  flex: 6 1 0;
+  min-height: 0;
+
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
   font-size: 12px;
@@ -103,4 +111,111 @@
 
 .chat-activity__msg {
   color: inherit;
+}
+
+/* Avatar profile panel (bottom of Activity) */
+.chat-activity__avatar {
+  /* 40% of remaining sidebar height (header excluded) */
+  flex: 4 1 0;
+  min-height: 0;
+  overflow: auto;
+
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+}
+
+.chat-activity__avatar .chat-avatar-btn.is-active {
+  border-color: color-mix(in oklab, var(--accent-2), var(--border) 35%);
+  background: color-mix(in oklab, var(--accent-2-subtle), var(--panel) 70%);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--accent-2), transparent 35%) inset,
+    0 0 14px color-mix(in oklab, var(--accent-2), transparent 70%);
+}
+
+.chat-activity__avatar .chat-avatar-btn.is-active:hover {
+  border-color: var(--accent-2);
+}
+
+/* Per-avatar "configured" indicator + preview */
+.chat-activity__avatar .avatar-indicator {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+}
+
+.chat-activity__avatar .avatar-indicator svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.25;
+}
+
+.chat-activity__avatar .avatar-indicator:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-activity__avatar .avatar-indicator:not(:disabled):hover {
+  background: color-mix(in oklab, var(--panel), #000 18%);
+  border-color: color-mix(in oklab, var(--accent-2), var(--border) 45%);
+  color: var(--accent-2);
+}
+
+/* Avatar preview dialog */
+.avatar-preview-dialog {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.avatar-preview-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.avatar-preview-dialog__panel {
+  width: min(420px, 92vw);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.avatar-preview-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.avatar-preview-dialog__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.avatar-preview-dialog__body {
+  padding: 14px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, var(--panel), #000 14%);
+}
+
+.avatar-preview-dialog__body img {
+  width: 220px;
+  height: 220px;
+  object-fit: cover;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--border), #000 20%);
+  box-shadow: 0 0 0 6px color-mix(in oklab, var(--panel), #000 18%);
 }
