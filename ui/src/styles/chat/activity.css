@@ -65,6 +65,26 @@
   padding: 2px 0;
 }
 
+.chat-activity__sep {
+  color: color-mix(in oklab, var(--muted), #c7f9cc 10%);
+  opacity: 0.7;
+}
+
+/* Level coloring (terminal-like) */
+.chat-activity__line--info .chat-activity__msg {
+  color: inherit;
+}
+
+.chat-activity__line--warn .chat-activity__tagtext,
+.chat-activity__line--warn .chat-activity__msg {
+  color: color-mix(in oklab, #fbbf24, var(--text) 15%);
+}
+
+.chat-activity__line--error .chat-activity__tagtext,
+.chat-activity__line--error .chat-activity__msg {
+  color: color-mix(in oklab, #fb7185, var(--text) 15%);
+}
+
 .chat-activity__ts {
   color: color-mix(in oklab, var(--muted), #c7f9cc 25%);
   font-variant-numeric: tabular-nums;

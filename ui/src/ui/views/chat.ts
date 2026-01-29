@@ -146,6 +146,17 @@ function formatElapsedSince(ts: number, base: number | null | undefined) {
 
 const activityBodyRef = createRef<HTMLElement>();
 
+function detectLogLevel(entry: { tag: string; text: string }): "info" | "warn" | "error" {
+  const t = `${entry.tag} ${entry.text}`.toLowerCase();
+  if (t.includes("phase: error") || t.includes("error") || t.includes("failed") || t.includes("exception")) {
+    return "error";
+  }
+  if (t.includes("warn") || t.includes("warning") || t.includes("retry") || t.includes("gap detected")) {
+    return "warn";
+  }
+  return "info";
+}
+
 function renderActivityPanel(props: ChatProps) {
   const open = props.activityPanelOpen !== false;
   const locked = Boolean(props.activityScrollLocked);
@@ -273,9 +284,10 @@ function renderActivityPanel(props: ChatProps) {
             >
               ${lines.map(
                 (l) => html`
-                  <div class="chat-activity__line">
+                  <div class="chat-activity__line chat-activity__line--${detectLogLevel({ tag: String(l.tag), text: String(l.text) })}">
                     <span class="chat-activity__ts">${formatClockTime(l.ts)}</span>
                     <span class="chat-activity__elapsed">${formatElapsedSince(l.ts, props.streamStartedAt)}</span>
+                    <span class="chat-activity__sep">│</span>
                     <span class="chat-activity__tagtext">[${String(l.tag).toUpperCase()}]</span>
                     <span class="chat-activity__msg">${l.text}</span>
                   </div>
