@@ -86,6 +86,16 @@ const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
 
 function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
+  // UI override (stored locally)
+  try {
+    const override = localStorage.getItem("clawdbot.control.avatar.override.v1");
+    if (override && (AVATAR_DATA_RE.test(override) || AVATAR_HTTP_RE.test(override))) {
+      return override;
+    }
+  } catch {
+    // ignore
+  }
+
   const list = state.agentsList?.agents ?? [];
   const parsed = parseAgentSessionKey(state.sessionKey);
   const agentId =
@@ -109,7 +119,8 @@ export function renderApp(state: AppViewState) {
   const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
-  const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
+  // If the UI has an explicit avatar override (data URL / http URL), prefer it over gateway avatar.
+  const chatAvatarUrl = assistantAvatarUrl ?? state.chatAvatarUrl ?? null;
 
   return html`
     <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
@@ -223,6 +234,7 @@ export function renderApp(state: AppViewState) {
                 state.sessionKey = next;
                 state.chatMessage = "";
                 state.resetToolStream();
+                state.activityLog = [];
                 state.applySettings({
                   ...state.settings,
                   sessionKey: next,
@@ -437,6 +449,7 @@ export function renderApp(state: AppViewState) {
                 state.chatRunId = null;
                 state.chatQueue = [];
                 state.resetToolStream();
+                state.activityLog = [];
                 state.resetChatScroll();
                 state.applySettings({
                   ...state.settings,
@@ -455,6 +468,7 @@ export function renderApp(state: AppViewState) {
               assistantAvatarUrl: chatAvatarUrl,
               messages: state.chatMessages,
               toolMessages: state.chatToolMessages,
+              activityLog: state.activityLog,
               stream: state.chatStream,
               streamStartedAt: state.chatStreamStartedAt,
               draft: state.chatMessage,
@@ -496,6 +510,10 @@ export function renderApp(state: AppViewState) {
               onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
               assistantName: state.assistantName,
               assistantAvatar: state.assistantAvatar,
+              activityPanelOpen: state.activityPanelOpen,
+              activityScrollLocked: state.activityScrollLocked,
+              onToggleActivityPanel: () => state.handleToggleActivityPanel(),
+              onActivityLockChange: (locked: boolean) => state.handleActivityLockChange(locked),
             })
           : nothing}
 

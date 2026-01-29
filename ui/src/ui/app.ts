@@ -122,6 +122,7 @@ export class ClawdbotApp extends LitElement {
   @state() chatMessage = "";
   @state() chatMessages: unknown[] = [];
   @state() chatToolMessages: unknown[] = [];
+  @state() activityLog: import("./app-tool-stream").ActivityLogEntry[] = [];
   @state() chatStream: string | null = null;
   @state() chatStreamStartedAt: number | null = null;
   @state() chatRunId: string | null = null;
@@ -135,6 +136,9 @@ export class ClawdbotApp extends LitElement {
   @state() sidebarContent: string | null = null;
   @state() sidebarError: string | null = null;
   @state() splitRatio = this.settings.splitRatio;
+  // Right activity panel (terminal-like progress)
+  @state() activityPanelOpen = this.settings.activityPanelOpen;
+  @state() activityScrollLocked = false;
 
   @state() nodesLoading = false;
   @state() nodes: Array<Record<string, unknown>> = [];
@@ -321,6 +325,10 @@ export class ClawdbotApp extends LitElement {
     );
   }
 
+  resetActivityLog() {
+    this.activityLog = [];
+  }
+
   resetChatScroll() {
     resetChatScrollInternal(
       this as unknown as Parameters<typeof resetChatScrollInternal>[0],
@@ -477,6 +485,18 @@ export class ClawdbotApp extends LitElement {
     const newRatio = Math.max(0.4, Math.min(0.7, ratio));
     this.splitRatio = newRatio;
     this.applySettings({ ...this.settings, splitRatio: newRatio });
+  }
+
+  handleToggleActivityPanel() {
+    const next = !this.activityPanelOpen;
+    this.activityPanelOpen = next;
+    this.applySettings({ ...this.settings, activityPanelOpen: next });
+    // When reopening, resume following.
+    if (next) this.activityScrollLocked = false;
+  }
+
+  handleActivityLockChange(locked: boolean) {
+    this.activityScrollLocked = locked;
   }
 
   render() {

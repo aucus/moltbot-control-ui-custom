@@ -16,6 +16,9 @@ export type MessageGroup = {
   messages: Array<{ message: unknown; key: string }>;
   timestamp: number;
   isStreaming: boolean;
+
+  /** UI-only: mark the most recent assistant reply group for easier visual focus. */
+  isFocus?: boolean;
 };
 
 /** Content item types in a normalized message */

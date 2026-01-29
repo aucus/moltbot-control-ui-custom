@@ -1,0 +1,102 @@
+/* =============================================
+   QUESTIONS SIDEBAR
+   ============================================= */
+
+.chat-thread-wrap {
+  /* Must participate in the parent flex column so the right thread stays scrollable */
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+
+  display: grid;
+  grid-template-columns: 420px 1fr 360px; /* questions | thread | activity */
+}
+
+.chat-thread-wrap--activity-collapsed {
+  grid-template-columns: 420px 1fr 56px;
+  gap: 14px;
+}
+
+/* In grid layout, .chat-thread's flex rules don't apply. Force it to fill the grid cell. */
+.chat-thread-wrap .chat-thread {
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 1200px) {
+  .chat-thread-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-questions {
+    display: none;
+  }
+
+  .chat-activity {
+    display: none;
+  }
+}
+
+.chat-questions {
+  position: sticky;
+  top: 12px;
+  align-self: start;
+  /* Avoid being covered by the sticky compose bar */
+  max-height: calc(100vh - 240px);
+
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  padding: 10px;
+  padding-bottom: 100px;
+}
+
+.chat-questions__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.chat-questions__list {
+  display: grid;
+  gap: 6px;
+}
+
+.chat-questions__item {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 8px;
+  align-items: start;
+  text-align: left;
+  padding: 8px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+
+.chat-questions__item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.chat-questions__num {
+  font-size: 13px; /* +2pt */
+  color: var(--muted);
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-questions__text {
+  font-size: 14px; /* +2pt */
+  color: var(--text);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}

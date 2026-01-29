@@ -35,11 +35,26 @@ export function scheduleChatScroll(host: ScrollHost, force = false) {
       host.chatScrollFrame = null;
       const target = pickScrollTarget();
       if (!target) return;
+      // If the user manually navigated via Questions, don't auto-stick to bottom.
+      const preventStick =
+        target instanceof HTMLElement && target.dataset?.preventStick === "1";
+      if (preventStick && !force) return;
+
       const distanceFromBottom =
         target.scrollHeight - target.scrollTop - target.clientHeight;
-      const shouldStick = force || host.chatUserNearBottom || distanceFromBottom < 200;
+
+      // If the user jumped via the Questions panel, we still want to resume auto-scroll
+      // on the next incoming message.
+      const jumped =
+        target instanceof HTMLElement && target.dataset?.forceStick === "1";
+      if (jumped && target instanceof HTMLElement) {
+        delete target.dataset.forceStick;
+      }
+
+      const shouldStick =
+        force || jumped || host.chatUserNearBottom || distanceFromBottom < 200;
       if (!shouldStick) return;
-      if (force) host.chatHasAutoScrolled = true;
+      if (force || jumped) host.chatHasAutoScrolled = true;
       target.scrollTop = target.scrollHeight;
       host.chatUserNearBottom = true;
       const retryDelay = force ? 150 : 120;
@@ -49,8 +64,14 @@ export function scheduleChatScroll(host: ScrollHost, force = false) {
         if (!latest) return;
         const latestDistanceFromBottom =
           latest.scrollHeight - latest.scrollTop - latest.clientHeight;
+        const jumpedRetry =
+          latest instanceof HTMLElement && latest.dataset?.forceStick === "1";
+        if (jumpedRetry && latest instanceof HTMLElement) {
+          delete latest.dataset.forceStick;
+        }
+
         const shouldStickRetry =
-          force || host.chatUserNearBottom || latestDistanceFromBottom < 200;
+          force || jumpedRetry || host.chatUserNearBottom || latestDistanceFromBottom < 200;
         if (!shouldStickRetry) return;
         latest.scrollTop = latest.scrollHeight;
         host.chatUserNearBottom = true;
@@ -81,6 +102,11 @@ export function handleChatScroll(host: ScrollHost, event: Event) {
   const distanceFromBottom =
     container.scrollHeight - container.scrollTop - container.clientHeight;
   host.chatUserNearBottom = distanceFromBottom < 200;
+
+  // If the user scrolls back to bottom, clear the "manual navigation" pin.
+  if (distanceFromBottom < 40) {
+    delete container.dataset.preventStick;
+  }
 }
 
 export function handleLogsScroll(host: ScrollHost, event: Event) {

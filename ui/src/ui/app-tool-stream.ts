@@ -13,6 +13,14 @@ export type AgentEventPayload = {
   data: Record<string, unknown>;
 };
 
+export type ActivityLogEntry = {
+  ts: number;
+  tag: "chat" | "llm" | "tool" | "compaction" | "system";
+  text: string;
+  runId?: string;
+  sessionKey?: string;
+};
+
 export type ToolStreamEntry = {
   toolCallId: string;
   runId: string;
@@ -32,6 +40,7 @@ type ToolStreamHost = {
   toolStreamOrder: string[];
   chatToolMessages: Record<string, unknown>[];
   toolStreamSyncTimer: number | null;
+  activityLog: ActivityLogEntry[];
 };
 
 function extractToolOutputText(value: unknown): string | null {
@@ -138,6 +147,10 @@ export function resetToolStream(host: ToolStreamHost) {
   flushToolStreamSync(host);
 }
 
+export function resetActivityLog(host: Pick<ToolStreamHost, "activityLog">) {
+  host.activityLog = [];
+}
+
 export type CompactionStatus = {
   active: boolean;
   startedAt: number | null;
@@ -154,6 +167,23 @@ const COMPACTION_TOAST_DURATION_MS = 5000;
 export function handleCompactionEvent(host: CompactionHost, payload: AgentEventPayload) {
   const data = payload.data ?? {};
   const phase = typeof data.phase === "string" ? data.phase : "";
+
+  // Activity log
+  try {
+    if (phase === "start") {
+      host.activityLog = [
+        ...host.activityLog,
+        { ts: Date.now(), tag: "compaction", text: "Compaction started", runId: payload.runId, sessionKey: payload.sessionKey },
+      ].slice(-800);
+    } else if (phase === "end") {
+      host.activityLog = [
+        ...host.activityLog,
+        { ts: Date.now(), tag: "compaction", text: "Compaction finished", runId: payload.runId, sessionKey: payload.sessionKey },
+      ].slice(-800);
+    }
+  } catch {
+    // ignore
+  }
 
   // Clear any existing timer
   if (host.compactionClearTimer != null) {
@@ -211,6 +241,59 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
       : phase === "result"
         ? formatToolOutput(data.result)
         : undefined;
+
+  // Append to the activity log as a real scrolling stream (do not collapse per tool).
+  try {
+    if (phase === "start") {
+      let argsText = "";
+      try {
+        argsText = data.args != null ? JSON.stringify(data.args) : "";
+      } catch {
+        argsText = "";
+      }
+      if (argsText.length > 1000) argsText = `${argsText.slice(0, 1000)}…`;
+      host.activityLog = [
+        ...host.activityLog,
+        {
+          ts: typeof payload.ts === "number" ? payload.ts : Date.now(),
+          tag: "tool",
+          text: `${name} · start${argsText ? ` · args: ${argsText}` : ""}`,
+          runId: payload.runId,
+          sessionKey,
+        },
+      ].slice(-800);
+    } else if (phase === "update") {
+      const txt = formatToolOutput(data.partialResult);
+      const preview = txt && txt.length > 1200 ? `${txt.slice(0, 1200)}…` : txt;
+      if (preview && preview.trim()) {
+        host.activityLog = [
+          ...host.activityLog,
+          {
+            ts: Date.now(),
+            tag: "tool",
+            text: `${name} · update · ${preview}`,
+            runId: payload.runId,
+            sessionKey,
+          },
+        ].slice(-800);
+      }
+    } else if (phase === "result") {
+      const txt = formatToolOutput(data.result);
+      const preview = txt && txt.length > 1200 ? `${txt.slice(0, 1200)}…` : txt;
+      host.activityLog = [
+        ...host.activityLog,
+        {
+          ts: Date.now(),
+          tag: "tool",
+          text: `${name} · result${preview ? ` · ${preview}` : ""}`,
+          runId: payload.runId,
+          sessionKey,
+        },
+      ].slice(-800);
+    }
+  } catch {
+    // ignore
+  }
 
   const now = Date.now();
   let entry = host.toolStreamById.get(toolCallId);

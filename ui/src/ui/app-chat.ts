@@ -74,6 +74,14 @@ async function sendChatMessageNow(
   },
 ) {
   resetToolStream(host as unknown as Parameters<typeof resetToolStream>[0]);
+  // New run: reset the visible activity log (right panel)
+  try {
+    (host as unknown as { activityLog: unknown[] }).activityLog = [];
+  } catch {
+    // ignore
+  }
+  // Immediately scroll to bottom and show the thinking indicator while the gateway run starts.
+  scheduleChatScroll(host as unknown as Parameters<typeof scheduleChatScroll>[0], true);
   const ok = await sendChatMessage(host as unknown as ClawdbotApp, message, opts?.attachments);
   if (!ok && opts?.previousDraft != null) {
     host.chatMessage = opts.previousDraft;

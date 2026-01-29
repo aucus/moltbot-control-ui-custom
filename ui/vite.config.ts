@@ -28,7 +28,7 @@ export default defineConfig(({ command }) => {
     },
     server: {
       host: true,
-      port: 5173,
+      port: Number(process.env.CLAWDBOT_CONTROL_UI_PORT ?? 5173),
       strictPort: true,
     },
   };

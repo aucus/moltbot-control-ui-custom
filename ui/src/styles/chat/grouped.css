@@ -5,9 +5,9 @@
 /* Chat Group Layout - default (assistant/other on left) */
 .chat-group {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   margin-left: 4px;
   margin-right: 16px;
 }
@@ -22,7 +22,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-width: min(900px, calc(100% - 60px));
+  /* Avatar got larger; reserve more space */
+  max-width: min(900px, calc(100% - 190px));
 }
 
 /* User messages align content right */
@@ -56,17 +57,25 @@
 
 /* Avatar Styles */
 .chat-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
   background: var(--panel-strong);
   display: grid;
   place-items: center;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 28px;
   flex-shrink: 0;
-  align-self: flex-end; /* Align with last message in group */
-  margin-bottom: 4px; /* Optical alignment */
+  align-self: flex-start; /* Align with first message in group */
+  margin-top: 2px;
+}
+
+/* Assistant avatar: 2x larger */
+.chat-avatar.assistant {
+  width: 160px;
+  height: 160px;
+  border-radius: 18px;
+  font-size: 56px;
 }
 
 .chat-avatar.user {
@@ -222,10 +231,21 @@ img.chat-avatar {
   background: var(--bg-hover);
 }
 
-/* User bubbles have different styling */
+/* User bubbles have different styling (make them more distinct and compact) */
 .chat-group.user .chat-bubble {
-  background: var(--accent-subtle);
-  border-color: transparent;
+  background: rgba(88, 101, 242, 0.14); /* discord-ish blurple tint */
+  border-color: rgba(88, 101, 242, 0.25);
+}
+
+:root[data-theme="light"] .chat-group.user .chat-bubble {
+  background: rgba(88, 101, 242, 0.10);
+  border-color: rgba(88, 101, 242, 0.30);
+}
+
+/* Focus the most recent assistant answer */
+.chat-group.assistant.focus .chat-bubble {
+  border-color: #ff3b30; /* red focus ring */
+  box-shadow: 0 0 0 1px rgba(255, 59, 48, 0.35);
 }
 
 :root[data-theme="light"] .chat-group.user .chat-bubble {

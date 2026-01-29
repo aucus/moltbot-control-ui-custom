@@ -1,0 +1,93 @@
+/* =============================================
+   INTERNAL DETAILS (Reasoning / Tool)
+   ============================================= */
+
+.chat-internal-details {
+  /* Minimal per-message handle (B option): keep it tiny and unobtrusive */
+  margin-top: 6px;
+  border: none;
+  background: transparent;
+}
+
+.chat-internal-details__summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  user-select: none;
+  opacity: 0.35;
+}
+
+.chat-bubble:hover .chat-internal-details__summary {
+  opacity: 0.9;
+  border-color: var(--border);
+  background: var(--bg-hover);
+}
+
+.chat-internal-details__summary::-webkit-details-marker {
+  display: none;
+}
+
+/* (B option) summary uses ⋯ text; no extra marker */
+
+.chat-internal-details__content {
+  padding: 8px 10px 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.chat-internal-section__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.chat-internal-section__body {
+  display: grid;
+  gap: 8px;
+}
+
+/* Fully-collapsed internal/tool messages */
+.chat-internal-message {
+  margin-top: 8px;
+}
+
+.chat-internal-message__summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 14px;
+  color: var(--muted);
+  opacity: 0.35;
+}
+
+.chat-thread .chat-internal-message__summary:hover {
+  opacity: 0.9;
+  border-color: var(--border);
+  background: var(--bg-hover);
+}
+
+.chat-internal-message__summary::-webkit-details-marker {
+  display: none;
+}
+
+/* (B option) summary uses ⋯ text; no extra marker */
+
+.chat-internal-message__content {
+  margin-top: 6px;
+}

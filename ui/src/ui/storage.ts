@@ -11,6 +11,7 @@ export type UiSettings = {
   chatFocusMode: boolean;
   chatShowThinking: boolean;
   splitRatio: number; // Sidebar split ratio (0.4 to 0.7, default 0.6)
+  activityPanelOpen: boolean; // Right activity panel (terminal-like)
   navCollapsed: boolean; // Collapsible sidebar state
   navGroupsCollapsed: Record<string, boolean>; // Which nav groups are collapsed
 };
@@ -30,6 +31,7 @@ export function loadSettings(): UiSettings {
     chatFocusMode: false,
     chatShowThinking: true,
     splitRatio: 0.6,
+    activityPanelOpen: true,
     navCollapsed: false,
     navGroupsCollapsed: {},
   };
@@ -75,6 +77,10 @@ export function loadSettings(): UiSettings {
         parsed.splitRatio <= 0.7
           ? parsed.splitRatio
           : defaults.splitRatio,
+      activityPanelOpen:
+        typeof parsed.activityPanelOpen === "boolean"
+          ? parsed.activityPanelOpen
+          : defaults.activityPanelOpen,
       navCollapsed:
         typeof parsed.navCollapsed === "boolean"
           ? parsed.navCollapsed

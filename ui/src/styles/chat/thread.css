@@ -1,0 +1,9 @@
+/* Ensure the chat thread can receive focus without showing an ugly outline */
+.chat-thread:focus {
+  outline: none;
+}
+
+.chat-thread:focus-visible {
+  outline: 2px solid rgba(255, 59, 48, 0.35);
+  outline-offset: 3px;
+}

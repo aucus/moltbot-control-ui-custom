@@ -132,24 +132,32 @@ export function renderMessageGroup(
     minute: "2-digit",
   });
 
+  const focusClass = group.isFocus && roleClass === "assistant" ? "focus" : "";
+
+  const renderedMessages = group.messages.map((item, index) =>
+    renderGroupedMessage(
+      item.message,
+      {
+        isStreaming: group.isStreaming && index === group.messages.length - 1,
+        showReasoning: false,
+        suppressInternals: true,
+      },
+      opts.onOpenSidebar,
+    ),
+  );
+
+  // If a group contains only internal/tool messages (fully suppressed), hide the entire group.
+  const hasVisibleMessage = renderedMessages.some((m) => m !== nothing);
+  if (!hasVisibleMessage) return nothing;
+
   return html`
-    <div class="chat-group ${roleClass}">
+    <div class="chat-group ${roleClass} ${focusClass}" id="chat-${group.key}">
       ${renderAvatar(group.role, {
         name: assistantName,
         avatar: opts.assistantAvatar ?? null,
       })}
       <div class="chat-group-messages">
-        ${group.messages.map((item, index) =>
-          renderGroupedMessage(
-            item.message,
-            {
-              isStreaming:
-                group.isStreaming && index === group.messages.length - 1,
-              showReasoning: opts.showReasoning,
-            },
-            opts.onOpenSidebar,
-          ),
-        )}
+        ${renderedMessages}
         <div class="chat-group-footer">
           <span class="chat-sender-name">${who}</span>
           <span class="chat-group-timestamp">${timestamp}</span>
@@ -226,7 +234,7 @@ function renderMessageImages(images: ImageBlock[]) {
 
 function renderGroupedMessage(
   message: unknown,
-  opts: { isStreaming: boolean; showReasoning: boolean },
+  opts: { isStreaming: boolean; showReasoning: boolean; suppressInternals?: boolean },
   onOpenSidebar?: (content: string) => void,
 ) {
   const m = message as Record<string, unknown>;
@@ -270,21 +278,100 @@ function renderGroupedMessage(
     )}`;
   }
 
+  // If internals are suppressed (session-wide internals mode), and there's no user-visible
+  // text/images to show, don't render anything for this message.
+  if (opts.suppressInternals && !markdown && !hasImages) return nothing;
+
   if (!markdown && !hasToolCards && !hasImages) return nothing;
+
+  // Collapse internal/tool messages by default.
+  const isInternal =
+    role === "tool" ||
+    isToolResult ||
+    role.toLowerCase() === "toolresult" ||
+    role.toLowerCase() === "tool_result";
+
+  // When the parent group wants to show a single global "⋯" internals, suppress per-message internals.
+  if (opts.suppressInternals && isInternal) return nothing;
+
+  const internalSections = html`
+    ${reasoningMarkdown
+      ? html`
+          <div class="chat-internal-section">
+            <div class="chat-internal-section__title">Reasoning</div>
+            <div class="chat-thinking">${unsafeHTML(
+              toSanitizedMarkdownHtml(reasoningMarkdown),
+            )}</div>
+          </div>
+        `
+      : nothing}
+    ${toolCards.length
+      ? html`
+          <div class="chat-internal-section">
+            <div class="chat-internal-section__title">Tool (${toolCards.length})</div>
+            <div class="chat-internal-section__body">
+              ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}
+            </div>
+          </div>
+        `
+      : nothing}
+  `;
+
+  // Per-message internals: disabled when suppressInternals=true (we'll render a single group-level ⋯).
+  const internalBlock =
+    !opts.suppressInternals && !isInternal && (reasoningMarkdown || toolCards.length)
+      ? html`
+          <details class="chat-internal-details">
+            <summary
+              class="chat-internal-details__summary"
+              aria-label="Show internals"
+              title="Show internals"
+            >
+              ⋯
+            </summary>
+            <div class="chat-internal-details__content">${internalSections}</div>
+          </details>
+        `
+      : nothing;
+
+  const content = html`
+    ${canCopyMarkdown ? renderCopyAsMarkdownButton(markdown!) : nothing}
+    ${renderMessageImages(images)}
+    ${internalBlock}
+    ${markdown
+      ? html`<div class="chat-text">${unsafeHTML(
+          toSanitizedMarkdownHtml(markdown),
+        )}</div>`
+      : nothing}
+  `;
+
+  // Tool-only / internal messages: fully collapsed container (single ⋯).
+  if (isInternal) {
+    return html`
+      <details class="chat-internal-message">
+        <summary
+          class="chat-internal-message__summary"
+          aria-label="Show internal message"
+          title="Show internal message"
+        >
+          ⋯
+        </summary>
+        <div class="chat-internal-message__content ${bubbleClasses}">
+          ${renderMessageImages(images)}
+          ${internalSections}
+          ${markdown
+            ? html`<div class="chat-text">${unsafeHTML(
+                toSanitizedMarkdownHtml(markdown),
+              )}</div>`
+            : nothing}
+        </div>
+      </details>
+    `;
+  }
 
   return html`
     <div class="${bubbleClasses}">
-      ${canCopyMarkdown ? renderCopyAsMarkdownButton(markdown!) : nothing}
-      ${renderMessageImages(images)}
-      ${reasoningMarkdown
-        ? html`<div class="chat-thinking">${unsafeHTML(
-            toSanitizedMarkdownHtml(reasoningMarkdown),
-          )}</div>`
-        : nothing}
-      ${markdown
-        ? html`<div class="chat-text">${unsafeHTML(toSanitizedMarkdownHtml(markdown))}</div>`
-        : nothing}
-      ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}
+      ${content}
     </div>
   `;
 }
