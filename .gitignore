@@ -70,3 +70,7 @@ USER.md
 # local tooling
 .serena/
 ui/package-lock.json
+
+# Local tooling
+.serena/
+.trash/
