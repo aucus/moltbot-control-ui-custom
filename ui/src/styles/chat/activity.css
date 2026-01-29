@@ -76,21 +76,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.chat-activity__tag {
-  display: inline-block;
-  padding: 1px 7px;
-  border: 1px solid color-mix(in oklab, var(--border), #c7f9cc 30%);
-  border-radius: 999px;
-  color: color-mix(in oklab, var(--muted), #c7f9cc 35%);
-  font-size: 11px;
+.chat-activity__tagtext {
+  color: color-mix(in oklab, #7dd3fc, var(--text) 15%);
+  font-variant-numeric: tabular-nums;
 }
 
-.chat-activity__tag--running {
-  color: color-mix(in oklab, #c7f9cc, var(--text) 15%);
-  border-color: rgba(80, 220, 140, 0.55);
-  background: rgba(80, 220, 140, 0.12);
-}
-
-.chat-activity__tag--idle {
-  opacity: 0.85;
+.chat-activity__msg {
+  color: inherit;
 }

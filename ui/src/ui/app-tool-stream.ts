@@ -1,4 +1,5 @@
 import { truncateText } from "./format";
+import { resolveToolDisplay, formatToolDetail } from "./tool-display";
 
 const TOOL_STREAM_LIMIT = 50;
 const TOOL_STREAM_THROTTLE_MS = 80;
@@ -243,7 +244,12 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
         : undefined;
 
   // Append to the activity log as a real scrolling stream (do not collapse per tool).
+  // Also enrich tool lines with a nicer label/detail (terminal-friendly).
   try {
+    const display = resolveToolDisplay({ name, args: phase === "start" ? data.args : undefined });
+    const detail = formatToolDetail(display);
+    const toolHead = detail ? `${display.label} (${detail})` : display.label;
+
     if (phase === "start") {
       let argsText = "";
       try {
@@ -257,7 +263,7 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
         {
           ts: typeof payload.ts === "number" ? payload.ts : Date.now(),
           tag: "tool",
-          text: `${name} · start${argsText ? ` · args: ${argsText}` : ""}`,
+          text: `${toolHead} :: start${argsText ? ` :: args=${argsText}` : ""}`,
           runId: payload.runId,
           sessionKey,
         },
@@ -271,7 +277,7 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
           {
             ts: Date.now(),
             tag: "tool",
-            text: `${name} · update · ${preview}`,
+            text: `${toolHead} :: update :: ${preview}`,
             runId: payload.runId,
             sessionKey,
           },
@@ -285,7 +291,7 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
         {
           ts: Date.now(),
           tag: "tool",
-          text: `${name} · result${preview ? ` · ${preview}` : ""}`,
+          text: `${toolHead} :: result${preview ? ` :: ${preview}` : ""}`,
           runId: payload.runId,
           sessionKey,
         },

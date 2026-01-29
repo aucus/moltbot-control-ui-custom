@@ -172,9 +172,7 @@ function renderActivityPanel(props: ChatProps) {
       : "idle"
     : "disconnected";
 
-  const tagClass = running
-    ? "chat-activity__tag chat-activity__tag--running"
-    : "chat-activity__tag chat-activity__tag--idle";
+  // Tag is rendered as terminal-style text: [LLM]/[TOOL]/...
 
   const lines = (() => {
     const out: Array<{ ts: number; tag: string; text: string }> = [];
@@ -187,18 +185,7 @@ function renderActivityPanel(props: ChatProps) {
       const tag = String((entry as any).tag ?? "tool");
       const text = String((entry as any).text ?? "");
 
-      // Nicer tool display when we can map it
-      if (tag === "tool") {
-        // entry.text begins with tool name, like "web_search · start …"
-        const toolName = text.split("·")[0]?.trim();
-        if (toolName) {
-          const display = resolveToolDisplay({ name: toolName, args: undefined });
-          const mapped = text.replace(toolName, display.label);
-          out.push({ ts, tag, text: mapped });
-          continue;
-        }
-      }
-
+      // Entries are pre-formatted by the activity log producer.
       out.push({ ts, tag, text });
     }
 
@@ -289,8 +276,8 @@ function renderActivityPanel(props: ChatProps) {
                   <div class="chat-activity__line">
                     <span class="chat-activity__ts">${formatClockTime(l.ts)}</span>
                     <span class="chat-activity__elapsed">${formatElapsedSince(l.ts, props.streamStartedAt)}</span>
-                    <span class=${tagClass}>${l.tag}</span>
-                    <span>${l.text}</span>
+                    <span class="chat-activity__tagtext">[${String(l.tag).toUpperCase()}]</span>
+                    <span class="chat-activity__msg">${l.text}</span>
                   </div>
                 `,
               )}
