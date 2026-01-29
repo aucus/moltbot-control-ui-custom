@@ -148,9 +148,37 @@ const activityBodyRef = createRef<HTMLElement>();
 
 type ActivityLevel = "info" | "warn" | "error";
 
+type ActivityFilter = "all" | "chat" | "llm" | "tool" | "compaction" | "system";
+
+const ACTIVITY_FILTER_KEY = "clawdbot.webchat.activity.filter.v1";
+
 function normalizeLogLevel(level: unknown, fallback: ActivityLevel = "info"): ActivityLevel {
   return level === "warn" || level === "error" || level === "info" ? level : fallback;
 }
+
+function normalizeFilter(v: unknown): ActivityFilter {
+  return v === "all" || v === "chat" || v === "llm" || v === "tool" || v === "compaction" || v === "system"
+    ? v
+    : "all";
+}
+
+function loadActivityFilter(): ActivityFilter {
+  try {
+    return normalizeFilter(safeJsonParse(localStorage.getItem(ACTIVITY_FILTER_KEY)));
+  } catch {
+    return "all";
+  }
+}
+
+function saveActivityFilter(next: ActivityFilter) {
+  try {
+    localStorage.setItem(ACTIVITY_FILTER_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
+
+let activityFilter: ActivityFilter = loadActivityFilter();
 
 function renderActivityPanel(props: ChatProps) {
   const open = props.activityPanelOpen !== false;
@@ -181,7 +209,7 @@ function renderActivityPanel(props: ChatProps) {
   // Tag is rendered as terminal-style text: [LLM]/[TOOL]/...
 
   const lines = (() => {
-    const out: Array<{ ts: number; tag: string; level: ActivityLevel; text: string }> = [];
+    const out: Array<{ ts: number; subsystem: string; event: string; tag: string; level: ActivityLevel; text: string }> = [];
 
     // Phase headline belongs in the header; the body should be a real, accumulated log.
 
@@ -189,16 +217,20 @@ function renderActivityPanel(props: ChatProps) {
     for (const entry of log) {
       const ts = typeof (entry as any).ts === "number" ? (entry as any).ts : now;
       const tag = String((entry as any).tag ?? "tool");
+      const subsystem = String((entry as any).subsystem ?? tag);
+      const event = String((entry as any).event ?? "");
       const level = normalizeLogLevel((entry as any).level, "info");
       const text = String((entry as any).text ?? "");
 
-      // Entries are pre-formatted by the activity log producer.
-      out.push({ ts, tag, level, text });
+      // Filtering by structured subsystem.
+      if (activityFilter !== "all" && subsystem !== activityFilter) return;
+
+      out.push({ ts, subsystem, event, tag, level, text });
     }
 
     // Fallback when nothing else exists
     if (out.length === 0) {
-      out.push({ ts: now, tag: "chat", level: "info", text: running ? "Working…" : "No active work" });
+      out.push({ ts: now, subsystem: "chat", event: "", tag: "chat", level: "info", text: running ? "Working…" : "No active work" });
     }
 
     return out.slice(-200);
@@ -236,6 +268,23 @@ function renderActivityPanel(props: ChatProps) {
         <div class="chat-activity__title">Activity</div>
         <div class="chat-activity__status">
           ${statusText}
+          <span class="chat-activity__sep" style="margin: 0 6px">│</span>
+          <span class="chat-activity__filters" style="display:inline-flex; gap:6px; align-items:center;">
+            ${(["all","llm","tool","chat"] as ActivityFilter[]).map((f) => html`
+              <button
+                class="btn btn--xs"
+                type="button"
+                aria-pressed=${activityFilter === f ? "true" : "false"}
+                title=${`Filter: ${f}`}
+                @click=${() => {
+                  activityFilter = f;
+                  saveActivityFilter(f);
+                }}
+              >
+                ${String(f).toUpperCase()}
+              </button>
+            `)}
+          </span>
           <button
             class="btn btn--xs"
             type="button"
@@ -284,7 +333,7 @@ function renderActivityPanel(props: ChatProps) {
                     <span class="chat-activity__ts">${formatClockTime(l.ts)}</span>
                     <span class="chat-activity__elapsed">${formatElapsedSince(l.ts, props.streamStartedAt)}</span>
                     <span class="chat-activity__sep">│</span>
-                    <span class="chat-activity__tagtext">[${String(l.tag).toUpperCase()}]</span>
+                    <span class="chat-activity__tagtext">[${String(l.subsystem).toUpperCase()}${l.event ? `:${String(l.event).toUpperCase()}` : ""}]</span>
                     <span class="chat-activity__msg">${l.text}</span>
                   </div>
                 `,

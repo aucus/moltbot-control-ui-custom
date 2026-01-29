@@ -17,7 +17,12 @@ export type AgentEventPayload = {
 export type ActivityLogEntry = {
   ts: number;
   tag: "chat" | "llm" | "tool" | "compaction" | "system";
+  /** Structured stream classification for filtering/display. */
+  subsystem?: "chat" | "llm" | "tool" | "compaction" | "system";
+  /** Structured event type for terminal-like readability (start/update/result/phase/...). */
+  event?: string;
   level?: "info" | "warn" | "error";
+  /** Human-friendly message body (keep single-line). */
   text: string;
   runId?: string;
   sessionKey?: string;
@@ -175,12 +180,12 @@ export function handleCompactionEvent(host: CompactionHost, payload: AgentEventP
     if (phase === "start") {
       host.activityLog = [
         ...host.activityLog,
-        { ts: Date.now(), tag: "compaction", level: "info", text: "Compaction started", runId: payload.runId, sessionKey: payload.sessionKey },
+        { ts: Date.now(), tag: "compaction", subsystem: "compaction", event: "start", level: "info", text: "Compaction started", runId: payload.runId, sessionKey: payload.sessionKey },
       ].slice(-800);
     } else if (phase === "end") {
       host.activityLog = [
         ...host.activityLog,
-        { ts: Date.now(), tag: "compaction", level: "info", text: "Compaction finished", runId: payload.runId, sessionKey: payload.sessionKey },
+        { ts: Date.now(), tag: "compaction", subsystem: "compaction", event: "end", level: "info", text: "Compaction finished", runId: payload.runId, sessionKey: payload.sessionKey },
       ].slice(-800);
     }
   } catch {
@@ -264,8 +269,10 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
         {
           ts: typeof payload.ts === "number" ? payload.ts : Date.now(),
           tag: "tool",
+          subsystem: "tool",
+          event: "start",
           level: "info",
-          text: `${toolHead} :: start${argsText ? ` :: args=${argsText}` : ""}`,
+          text: `${toolHead}${argsText ? ` :: args=${argsText}` : ""}`,
           runId: payload.runId,
           sessionKey,
         },
@@ -279,8 +286,10 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
           {
             ts: Date.now(),
             tag: "tool",
+            subsystem: "tool",
+            event: "update",
             level: "info",
-            text: `${toolHead} :: update :: ${preview}`,
+            text: `${toolHead} :: ${preview}`,
             runId: payload.runId,
             sessionKey,
           },
@@ -294,8 +303,10 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
         {
           ts: Date.now(),
           tag: "tool",
+          subsystem: "tool",
+          event: "result",
           level: "info",
-          text: `${toolHead} :: result${preview ? ` :: ${preview}` : ""}`,
+          text: `${toolHead}${preview ? ` :: ${preview}` : ""}`,
           runId: payload.runId,
           sessionKey,
         },
