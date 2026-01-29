@@ -146,15 +146,10 @@ function formatElapsedSince(ts: number, base: number | null | undefined) {
 
 const activityBodyRef = createRef<HTMLElement>();
 
-function detectLogLevel(entry: { tag: string; text: string }): "info" | "warn" | "error" {
-  const t = `${entry.tag} ${entry.text}`.toLowerCase();
-  if (t.includes("phase: error") || t.includes("error") || t.includes("failed") || t.includes("exception")) {
-    return "error";
-  }
-  if (t.includes("warn") || t.includes("warning") || t.includes("retry") || t.includes("gap detected")) {
-    return "warn";
-  }
-  return "info";
+type ActivityLevel = "info" | "warn" | "error";
+
+function normalizeLogLevel(level: unknown, fallback: ActivityLevel = "info"): ActivityLevel {
+  return level === "warn" || level === "error" || level === "info" ? level : fallback;
 }
 
 function renderActivityPanel(props: ChatProps) {
@@ -186,7 +181,7 @@ function renderActivityPanel(props: ChatProps) {
   // Tag is rendered as terminal-style text: [LLM]/[TOOL]/...
 
   const lines = (() => {
-    const out: Array<{ ts: number; tag: string; text: string }> = [];
+    const out: Array<{ ts: number; tag: string; level: ActivityLevel; text: string }> = [];
 
     // Phase headline belongs in the header; the body should be a real, accumulated log.
 
@@ -194,15 +189,16 @@ function renderActivityPanel(props: ChatProps) {
     for (const entry of log) {
       const ts = typeof (entry as any).ts === "number" ? (entry as any).ts : now;
       const tag = String((entry as any).tag ?? "tool");
+      const level = normalizeLogLevel((entry as any).level, "info");
       const text = String((entry as any).text ?? "");
 
       // Entries are pre-formatted by the activity log producer.
-      out.push({ ts, tag, text });
+      out.push({ ts, tag, level, text });
     }
 
     // Fallback when nothing else exists
     if (out.length === 0) {
-      out.push({ ts: now, tag: "chat", text: running ? "Working…" : "No active work" });
+      out.push({ ts: now, tag: "chat", level: "info", text: running ? "Working…" : "No active work" });
     }
 
     return out.slice(-200);
@@ -284,7 +280,7 @@ function renderActivityPanel(props: ChatProps) {
             >
               ${lines.map(
                 (l) => html`
-                  <div class="chat-activity__line chat-activity__line--${detectLogLevel({ tag: String(l.tag), text: String(l.text) })}">
+                  <div class="chat-activity__line chat-activity__line--${l.level}">
                     <span class="chat-activity__ts">${formatClockTime(l.ts)}</span>
                     <span class="chat-activity__elapsed">${formatElapsedSince(l.ts, props.streamStartedAt)}</span>
                     <span class="chat-activity__sep">│</span>

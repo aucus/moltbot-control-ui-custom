@@ -106,8 +106,8 @@ export async function sendChatMessage(
     const log = Array.isArray(state.activityLog) ? state.activityLog : [];
     state.activityLog = [
       ...log,
-      { ts: now, tag: "chat", text: `run started (session=${state.sessionKey}, runId=${runId})`, runId, sessionKey: state.sessionKey },
-      { ts: now, tag: "llm", text: "phase: thinking (waiting for first token)", runId, sessionKey: state.sessionKey },
+      { ts: now, tag: "chat", level: "info", text: `run started (session=${state.sessionKey}, runId=${runId})`, runId, sessionKey: state.sessionKey },
+      { ts: now, tag: "llm", level: "info", text: "phase: thinking (waiting for first token)", runId, sessionKey: state.sessionKey },
     ].slice(-800);
   } catch {
     // ignore
@@ -211,7 +211,7 @@ export function handleChatEvent(
           state.llmFirstTokenSeen = true;
           state.activityLog = [
             ...log,
-            { ts: now, tag: "llm", text: "phase: answering (first token received)", runId, sessionKey },
+            { ts: now, tag: "llm", level: "info", text: "phase: answering (first token received)", runId, sessionKey },
           ].slice(-800);
         }
 
@@ -222,7 +222,7 @@ export function handleChatEvent(
           const words = Math.max(0, next.trim().split(/\s+/).filter(Boolean).length);
           state.activityLog = [
             ...(Array.isArray(state.activityLog) ? state.activityLog : log),
-            { ts: now, tag: "llm", text: `streaming… (${chars} chars, ${words} words)`, runId, sessionKey },
+            { ts: now, tag: "llm", level: "info", text: `streaming… (${chars} chars, ${words} words)`, runId, sessionKey },
           ].slice(-800);
         }
       } catch {
@@ -237,7 +237,7 @@ export function handleChatEvent(
       const log = Array.isArray(state.activityLog) ? state.activityLog : [];
       state.activityLog = [
         ...log,
-        { ts: now, tag: "llm", text: "phase: done (final)", runId, sessionKey },
+        { ts: now, tag: "llm", level: "info", text: "phase: done (final)", runId, sessionKey },
       ].slice(-800);
     } catch {
       // ignore
@@ -254,7 +254,7 @@ export function handleChatEvent(
       const log = Array.isArray(state.activityLog) ? state.activityLog : [];
       state.activityLog = [
         ...log,
-        { ts: now, tag: "llm", text: "phase: aborted", runId, sessionKey },
+        { ts: now, tag: "llm", level: "warn", text: "phase: aborted", runId, sessionKey },
       ].slice(-800);
     } catch {
       // ignore
@@ -272,7 +272,7 @@ export function handleChatEvent(
       const msg = payload.errorMessage ?? "chat error";
       state.activityLog = [
         ...log,
-        { ts: now, tag: "llm", text: `phase: error (${msg})`, runId, sessionKey },
+        { ts: now, tag: "llm", level: "error", text: `phase: error (${msg})`, runId, sessionKey },
       ].slice(-800);
     } catch {
       // ignore
