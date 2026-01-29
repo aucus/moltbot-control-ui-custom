@@ -43,47 +43,52 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
   font-size: 12px;
-  line-height: 1.35;
-  white-space: pre-wrap;
-  word-break: break-word;
+  line-height: 1.55;
+
+  /* Terminal feel */
+  background: color-mix(in oklab, #0b0f14, var(--panel) 35%);
+  color: color-mix(in oklab, #c7f9cc, var(--text) 25%);
+  border: 1px solid color-mix(in oklab, var(--border), #0b0f14 40%);
+  border-radius: 10px;
+  padding: 10px;
+
+  /* Single-line log entries */
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: auto;
 }
 
 .chat-activity__line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   padding: 2px 0;
-  border-bottom: 1px dashed rgba(127, 127, 127, 0.18);
-}
-
-.chat-activity__line:last-child {
-  border-bottom: none;
 }
 
 .chat-activity__ts {
-  color: var(--muted);
-  margin-right: 6px;
+  color: color-mix(in oklab, var(--muted), #c7f9cc 25%);
   font-variant-numeric: tabular-nums;
 }
 
 .chat-activity__elapsed {
-  color: var(--muted);
-  opacity: 0.8;
-  margin-right: 8px;
+  color: color-mix(in oklab, var(--muted), #c7f9cc 20%);
+  opacity: 0.9;
   font-variant-numeric: tabular-nums;
 }
 
 .chat-activity__tag {
   display: inline-block;
-  margin-right: 6px;
-  padding: 1px 6px;
-  border: 1px solid var(--border);
+  padding: 1px 7px;
+  border: 1px solid color-mix(in oklab, var(--border), #c7f9cc 30%);
   border-radius: 999px;
-  color: var(--muted);
+  color: color-mix(in oklab, var(--muted), #c7f9cc 35%);
   font-size: 11px;
 }
 
 .chat-activity__tag--running {
-  color: var(--text);
-  border-color: rgba(90, 160, 255, 0.55);
-  background: rgba(90, 160, 255, 0.12);
+  color: color-mix(in oklab, #c7f9cc, var(--text) 15%);
+  border-color: rgba(80, 220, 140, 0.55);
+  background: rgba(80, 220, 140, 0.12);
 }
 
 .chat-activity__tag--idle {

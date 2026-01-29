@@ -158,11 +158,17 @@ function renderActivityPanel(props: ChatProps) {
   const startedAt = props.streamStartedAt;
   const elapsed = running && startedAt ? formatDurationMs(now - startedAt) : null;
 
+  const phaseHead = (() => {
+    if (!running) return "idle";
+    const streamText = String(props.stream ?? "");
+    return streamText && streamText.length > 0 ? "ANSWER" : "THINK";
+  })();
+
   const statusText = props.connected
     ? running
       ? elapsed
-        ? `running · ${elapsed}`
-        : "running"
+        ? `${phaseHead} · running · ${elapsed}`
+        : `${phaseHead} · running`
       : "idle"
     : "disconnected";
 
@@ -173,17 +179,7 @@ function renderActivityPanel(props: ChatProps) {
   const lines = (() => {
     const out: Array<{ ts: number; tag: string; text: string }> = [];
 
-    // Human-readable phases (best-effort)
-    if (running && props.streamStartedAt) {
-      out.push({ ts: props.streamStartedAt, tag: "chat", text: "Run started" });
-
-      const streamText = String(props.stream ?? "");
-      if (!streamText) {
-        out.push({ ts: now, tag: "llm", text: "LLM 생각중…" });
-      } else {
-        out.push({ ts: now, tag: "llm", text: "답변 생성 중…" });
-      }
-    }
+    // Phase headline belongs in the header; the body should be a real, accumulated log.
 
     // Activity stream (already line-based; no collapsing)
     for (const entry of log) {

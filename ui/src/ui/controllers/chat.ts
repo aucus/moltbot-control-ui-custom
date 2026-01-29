@@ -2,6 +2,7 @@ import { extractText } from "../chat/message-extract";
 import type { GatewayBrowserClient } from "../gateway";
 import { generateUUID } from "../uuid";
 import type { ChatAttachment } from "../ui-types";
+import type { ActivityLogEntry } from "../app-tool-stream";
 
 export type ChatState = {
   client: GatewayBrowserClient | null;
@@ -17,6 +18,10 @@ export type ChatState = {
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   lastError: string | null;
+  // Activity panel log (terminal-like)
+  activityLog?: ActivityLogEntry[];
+  llmLogLastAtMs?: number;
+  llmFirstTokenSeen?: boolean;
 };
 
 export type ChatEventPayload = {
@@ -93,6 +98,20 @@ export async function sendChatMessage(
   state.chatRunId = runId;
   state.chatStream = "";
   state.chatStreamStartedAt = now;
+  state.llmLogLastAtMs = 0;
+  state.llmFirstTokenSeen = false;
+
+  // Activity log: new run header
+  try {
+    const log = Array.isArray(state.activityLog) ? state.activityLog : [];
+    state.activityLog = [
+      ...log,
+      { ts: now, tag: "chat", text: `run started (session=${state.sessionKey}, runId=${runId})`, runId, sessionKey: state.sessionKey },
+      { ts: now, tag: "llm", text: "phase: thinking (waiting for first token)", runId, sessionKey: state.sessionKey },
+    ].slice(-800);
+  } catch {
+    // ignore
+  }
 
   // Convert attachments to API format
   const apiAttachments = hasAttachments
@@ -176,20 +195,89 @@ export function handleChatEvent(
   if (payload.state === "delta") {
     const next = extractText(payload.message);
     if (typeof next === "string") {
-      const current = state.chatStream ?? "";
-      if (!current || next.length >= current.length) {
+      const prev = state.chatStream ?? "";
+      if (!prev || next.length >= prev.length) {
         state.chatStream = next;
+      }
+
+      // Activity log: first token + periodic progress
+      try {
+        const now = Date.now();
+        const runId = state.chatRunId ?? payload.runId;
+        const sessionKey = state.sessionKey;
+        const log = Array.isArray(state.activityLog) ? state.activityLog : [];
+
+        if (!state.llmFirstTokenSeen && next.length > 0) {
+          state.llmFirstTokenSeen = true;
+          state.activityLog = [
+            ...log,
+            { ts: now, tag: "llm", text: "phase: answering (first token received)", runId, sessionKey },
+          ].slice(-800);
+        }
+
+        const lastAt = typeof state.llmLogLastAtMs === "number" ? state.llmLogLastAtMs : 0;
+        if (now - lastAt >= 900) {
+          state.llmLogLastAtMs = now;
+          const chars = next.length;
+          const words = Math.max(0, next.trim().split(/\s+/).filter(Boolean).length);
+          state.activityLog = [
+            ...(Array.isArray(state.activityLog) ? state.activityLog : log),
+            { ts: now, tag: "llm", text: `streaming… (${chars} chars, ${words} words)`, runId, sessionKey },
+          ].slice(-800);
+        }
+      } catch {
+        // ignore
       }
     }
   } else if (payload.state === "final") {
+    try {
+      const now = Date.now();
+      const runId = payload.runId;
+      const sessionKey = state.sessionKey;
+      const log = Array.isArray(state.activityLog) ? state.activityLog : [];
+      state.activityLog = [
+        ...log,
+        { ts: now, tag: "llm", text: "phase: done (final)", runId, sessionKey },
+      ].slice(-800);
+    } catch {
+      // ignore
+    }
+
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
   } else if (payload.state === "aborted") {
+    try {
+      const now = Date.now();
+      const runId = payload.runId;
+      const sessionKey = state.sessionKey;
+      const log = Array.isArray(state.activityLog) ? state.activityLog : [];
+      state.activityLog = [
+        ...log,
+        { ts: now, tag: "llm", text: "phase: aborted", runId, sessionKey },
+      ].slice(-800);
+    } catch {
+      // ignore
+    }
+
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
   } else if (payload.state === "error") {
+    try {
+      const now = Date.now();
+      const runId = payload.runId;
+      const sessionKey = state.sessionKey;
+      const log = Array.isArray(state.activityLog) ? state.activityLog : [];
+      const msg = payload.errorMessage ?? "chat error";
+      state.activityLog = [
+        ...log,
+        { ts: now, tag: "llm", text: `phase: error (${msg})`, runId, sessionKey },
+      ].slice(-800);
+    } catch {
+      // ignore
+    }
+
     state.chatStream = null;
     state.chatRunId = null;
     state.chatStreamStartedAt = null;
