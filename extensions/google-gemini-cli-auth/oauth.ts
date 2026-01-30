@@ -188,6 +188,95 @@ function buildAuthUrl(challenge: string, verifier: string): string {
   return `${AUTH_URL}?${params.toString()}`;
 }
 
+/** In-memory store for headless OAuth (Control UI): state -> PKCE code_verifier */
+const stateToVerifier = new Map<string, string>();
+
+/**
+ * Build auth URL for headless OAuth (Gateway redirect_uri + state).
+ * Stores code_verifier by state for oauthCallback.
+ */
+export function buildAuthUrlForRedirect(redirectUri: string, state: string): { url: string; codeVerifier: string } {
+  const { verifier, challenge } = generatePkce();
+  stateToVerifier.set(state, verifier);
+  const { clientId } = resolveOAuthClientConfig();
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: "code",
+    redirect_uri: redirectUri,
+    scope: SCOPES.join(" "),
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    state,
+    access_type: "offline",
+    prompt: "consent",
+  });
+  return { url: `${AUTH_URL}?${params.toString()}`, codeVerifier: verifier };
+}
+
+/**
+ * Complete headless OAuth: exchange code using stored verifier for state.
+ * Call after buildAuthUrlForRedirect; consumes the stored verifier.
+ */
+export function consumeHeadlessState(state: string): string | undefined {
+  const verifier = stateToVerifier.get(state);
+  stateToVerifier.delete(state);
+  return verifier;
+}
+
+/**
+ * Exchange authorization code for tokens (supports custom redirect_uri for headless).
+ */
+export async function exchangeCodeForTokensWithRedirect(
+  code: string,
+  verifier: string,
+  redirectUri: string,
+): Promise<GeminiCliOAuthCredentials> {
+  const { clientId, clientSecret } = resolveOAuthClientConfig();
+  const body = new URLSearchParams({
+    client_id: clientId,
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri,
+    code_verifier: verifier,
+  });
+  if (clientSecret) {
+    body.set("client_secret", clientSecret);
+  }
+
+  const response = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Token exchange failed: ${errorText}`);
+  }
+
+  const data = (await response.json()) as {
+    access_token: string;
+    refresh_token: string;
+    expires_in: number;
+  };
+
+  if (!data.refresh_token) {
+    throw new Error("No refresh token received. Please try again.");
+  }
+
+  const email = await getUserEmail(data.access_token);
+  const projectId = await discoverProject(data.access_token);
+  const expiresAt = Date.now() + data.expires_in * 1000 - 5 * 60 * 1000;
+
+  return {
+    refresh: data.refresh_token,
+    access: data.access_token,
+    expires: expiresAt,
+    projectId,
+    email,
+  };
+}
+
 function parseCallbackInput(
   input: string,
   expectedState: string,
@@ -300,50 +389,7 @@ async function waitForLocalCallback(params: {
 }
 
 async function exchangeCodeForTokens(code: string, verifier: string): Promise<GeminiCliOAuthCredentials> {
-  const { clientId, clientSecret } = resolveOAuthClientConfig();
-  const body = new URLSearchParams({
-    client_id: clientId,
-    code,
-    grant_type: "authorization_code",
-    redirect_uri: REDIRECT_URI,
-    code_verifier: verifier,
-  });
-  if (clientSecret) {
-    body.set("client_secret", clientSecret);
-  }
-
-  const response = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Token exchange failed: ${errorText}`);
-  }
-
-  const data = (await response.json()) as {
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-  };
-
-  if (!data.refresh_token) {
-    throw new Error("No refresh token received. Please try again.");
-  }
-
-  const email = await getUserEmail(data.access_token);
-  const projectId = await discoverProject(data.access_token);
-  const expiresAt = Date.now() + data.expires_in * 1000 - 5 * 60 * 1000;
-
-  return {
-    refresh: data.refresh_token,
-    access: data.access_token,
-    expires: expiresAt,
-    projectId,
-    email,
-  };
+  return exchangeCodeForTokensWithRedirect(code, verifier, REDIRECT_URI);
 }
 
 async function getUserEmail(accessToken: string): Promise<string | undefined> {

@@ -86,6 +86,31 @@ function buildAuthUrl(params: { challenge: string; state: string }): string {
   return url.toString();
 }
 
+/** In-memory store for headless OAuth (Control UI): state -> PKCE code_verifier */
+const stateToVerifier = new Map<string, string>();
+
+function buildAuthUrlForRedirect(redirectUri: string, state: string): { url: string; codeVerifier: string } {
+  const { verifier, challenge } = generatePkce();
+  stateToVerifier.set(state, verifier);
+  const url = new URL(AUTH_URL);
+  url.searchParams.set("client_id", CLIENT_ID);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("redirect_uri", redirectUri);
+  url.searchParams.set("scope", SCOPES.join(" "));
+  url.searchParams.set("code_challenge", challenge);
+  url.searchParams.set("code_challenge_method", "S256");
+  url.searchParams.set("state", state);
+  url.searchParams.set("access_type", "offline");
+  url.searchParams.set("prompt", "consent");
+  return { url: url.toString(), codeVerifier: verifier };
+}
+
+function consumeHeadlessState(state: string): string | undefined {
+  const verifier = stateToVerifier.get(state);
+  stateToVerifier.delete(state);
+  return verifier;
+}
+
 function parseCallbackInput(
   input: string,
 ): { code: string; state: string } | { error: string } {
@@ -174,9 +199,10 @@ async function startCallbackServer(params: { timeoutMs: number }) {
   };
 }
 
-async function exchangeCode(params: {
+async function exchangeCodeWithRedirect(params: {
   code: string;
   verifier: string;
+  redirectUri: string;
 }): Promise<{ access: string; refresh: string; expires: number }> {
   const response = await fetch(TOKEN_URL, {
     method: "POST",
@@ -186,7 +212,7 @@ async function exchangeCode(params: {
       client_secret: CLIENT_SECRET,
       code: params.code,
       grant_type: "authorization_code",
-      redirect_uri: REDIRECT_URI,
+      redirect_uri: params.redirectUri,
       code_verifier: params.verifier,
     }),
   });
@@ -355,7 +381,7 @@ async function loginAntigravity(params: {
   }
 
   params.progress.update("Exchanging code for tokens…");
-  const tokens = await exchangeCode({ code, verifier });
+  const tokens = await exchangeCodeWithRedirect({ code, verifier, redirectUri: REDIRECT_URI });
   const email = await fetchUserEmail(tokens.access);
   const projectId = await fetchProjectId(tokens.access);
 
@@ -427,6 +453,54 @@ const antigravityPlugin = {
               spin.stop("Antigravity OAuth failed");
               throw err;
             }
+          },
+          oauthStart: async (ctx) => {
+            const { url } = buildAuthUrlForRedirect(ctx.redirectUri, ctx.state);
+            return { url };
+          },
+          oauthCallback: async (ctx) => {
+            const verifier = consumeHeadlessState(ctx.state);
+            if (!verifier) {
+              throw new Error("Invalid or expired OAuth state");
+            }
+            const tokens = await exchangeCodeWithRedirect({
+              code: ctx.code,
+              verifier,
+              redirectUri: ctx.redirectUri,
+            });
+            const email = await fetchUserEmail(tokens.access);
+            const projectId = await fetchProjectId(tokens.access);
+            const profileId = `google-antigravity:${email ?? "default"}`;
+            return {
+              profiles: [
+                {
+                  profileId,
+                  credential: {
+                    type: "oauth",
+                    provider: "google-antigravity",
+                    access: tokens.access,
+                    refresh: tokens.refresh,
+                    expires: tokens.expires,
+                    email,
+                    projectId,
+                  },
+                },
+              ],
+              configPatch: {
+                agents: {
+                  defaults: {
+                    models: {
+                      [DEFAULT_MODEL]: {},
+                    },
+                  },
+                },
+              },
+              defaultModel: DEFAULT_MODEL,
+              notes: [
+                "Antigravity uses Google Cloud project quotas.",
+                "Enable Gemini for Google Cloud on your project if requests fail.",
+              ],
+            };
           },
         },
       ],

@@ -40,6 +40,7 @@ import { renderInstances } from "./views/instances";
 import { renderLogs } from "./views/logs";
 import { renderNodes } from "./views/nodes";
 import { renderOverview } from "./views/overview";
+import { renderProviders } from "./views/providers";
 import { renderSessions } from "./views/sessions";
 import { renderExecApprovalPrompt } from "./views/exec-approval";
 import {
@@ -53,6 +54,7 @@ import { renderSkills } from "./views/skills";
 import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers";
 import { loadChannels } from "./controllers/channels";
 import { loadPresence } from "./controllers/presence";
+import { loadProviders } from "./controllers/providers";
 import { deleteSession, loadSessions, patchSession } from "./controllers/sessions";
 import {
   installSkill,
@@ -291,6 +293,25 @@ export function renderApp(state: AppViewState) {
               lastError: state.presenceError,
               statusMessage: state.presenceStatus,
               onRefresh: () => loadPresence(state),
+            })
+          : nothing}
+
+        ${state.tab === "providers"
+          ? renderProviders({
+              loading: state.providersLoading,
+              list: state.providersList,
+              error: state.providersError,
+              oauthStarting: state.oauthStarting,
+              apiKeySaving: state.apiKeySaving,
+              oauthSuccess: state.providersOauthSuccess,
+              oauthError: state.providersOauthError,
+              basePath: state.basePath,
+              onRefresh: () => state.loadProviders(),
+              onOAuthStart: (providerId, methodId) =>
+                state.handleOAuthStart(providerId, methodId),
+              onApiKeySave: (providerId, apiKey, methodId) =>
+                state.handleApiKeySave(providerId, apiKey, methodId),
+              onDismissOAuthResult: () => state.handleDismissOAuthResult(),
             })
           : nothing}
 

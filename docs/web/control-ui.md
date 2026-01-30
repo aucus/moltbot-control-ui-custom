@@ -41,9 +41,19 @@ The onboarding wizard generates a gateway token by default, so paste it here on 
 - Config: apply + restart with validation (`config.apply`) and wake the last active session
 - Config writes include a base-hash guard to prevent clobbering concurrent edits
 - Config schema + form rendering (`config.schema`, including plugin + channel schemas); Raw JSON editor remains available
+- **Providers:** connect LLM providers (OAuth or API key) from the **Providers** tab (`models.auth.list`, `models.auth.oauthStart`, `models.auth.apiKeySet`); see [Providers (LLM auth)](#providers-llm-auth) below
 - Debug: status/health/models snapshots + event log + manual RPC calls (`status`, `health`, `models.list`)
 - Logs: live tail of gateway file logs with filter/export (`logs.tail`)
 - Update: run a package/git update + restart (`update.run`) with a restart report
+
+## Providers (LLM auth)
+
+The **Providers** tab lists connectable LLM providers (from plugins). You can link a provider in two ways:
+
+1. **OAuth** — Click **Connect** next to an OAuth method (e.g. Google OAuth). A browser window opens; after you sign in, the callback is handled by the Gateway and credentials are saved. Supported by plugins that implement `oauthStart` and `oauthCallback` (e.g. Gemini CLI, Antigravity).
+2. **API key / token** — Enter the API key in the field and click **Save**. The Gateway writes it to `models.providers.<providerId>` in config. Works for providers that expose an `api_key` or `token` auth method and have a default config (base URL, models list).
+
+After a successful connection, the UI shows “Provider connected.” You can then use that provider’s models in chat or set it as the default model in config.
 
 ## Chat behavior
 

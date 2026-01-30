@@ -13,6 +13,12 @@ import type {
   AgentsListParamsSchema,
   AgentsListResultSchema,
   ModelChoiceSchema,
+  ModelsAuthApiKeySetParamsSchema,
+  ModelsAuthApiKeySetResultSchema,
+  ModelsAuthListParamsSchema,
+  ModelsAuthListResultSchema,
+  ModelsAuthOAuthStartParamsSchema,
+  ModelsAuthOAuthStartResultSchema,
   ModelsListParamsSchema,
   ModelsListResultSchema,
   SkillsBinsParamsSchema,
@@ -177,6 +183,12 @@ export type AgentsListResult = Static<typeof AgentsListResultSchema>;
 export type ModelChoice = Static<typeof ModelChoiceSchema>;
 export type ModelsListParams = Static<typeof ModelsListParamsSchema>;
 export type ModelsListResult = Static<typeof ModelsListResultSchema>;
+export type ModelsAuthApiKeySetParams = Static<typeof ModelsAuthApiKeySetParamsSchema>;
+export type ModelsAuthApiKeySetResult = Static<typeof ModelsAuthApiKeySetResultSchema>;
+export type ModelsAuthListParams = Static<typeof ModelsAuthListParamsSchema>;
+export type ModelsAuthListResult = Static<typeof ModelsAuthListResultSchema>;
+export type ModelsAuthOAuthStartParams = Static<typeof ModelsAuthOAuthStartParamsSchema>;
+export type ModelsAuthOAuthStartResult = Static<typeof ModelsAuthOAuthStartResultSchema>;
 export type SkillsStatusParams = Static<typeof SkillsStatusParamsSchema>;
 export type SkillsBinsParams = Static<typeof SkillsBinsParamsSchema>;
 export type SkillsBinsResult = Static<typeof SkillsBinsResultSchema>;

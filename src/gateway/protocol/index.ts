@@ -99,6 +99,14 @@ import {
   LogsTailResultSchema,
   type ModelsListParams,
   ModelsListParamsSchema,
+  type ModelsAuthApiKeySetParams,
+  ModelsAuthApiKeySetParamsSchema,
+  type ModelsAuthApiKeySetResult,
+  ModelsAuthApiKeySetResultSchema,
+  type ModelsAuthListParams,
+  ModelsAuthListParamsSchema,
+  type ModelsAuthOAuthStartParams,
+  ModelsAuthOAuthStartParamsSchema,
   type NodeDescribeParams,
   NodeDescribeParamsSchema,
   type NodeEventParams,
@@ -264,6 +272,15 @@ export const validateChannelsLogoutParams = ajv.compile<ChannelsLogoutParams>(
   ChannelsLogoutParamsSchema,
 );
 export const validateModelsListParams = ajv.compile<ModelsListParams>(ModelsListParamsSchema);
+export const validateModelsAuthApiKeySetParams = ajv.compile<ModelsAuthApiKeySetParams>(
+  ModelsAuthApiKeySetParamsSchema,
+);
+export const validateModelsAuthListParams = ajv.compile<ModelsAuthListParams>(
+  ModelsAuthListParamsSchema,
+);
+export const validateModelsAuthOAuthStartParams = ajv.compile<ModelsAuthOAuthStartParams>(
+  ModelsAuthOAuthStartParamsSchema,
+);
 export const validateSkillsStatusParams = ajv.compile<SkillsStatusParams>(SkillsStatusParamsSchema);
 export const validateSkillsBinsParams = ajv.compile<SkillsBinsParams>(SkillsBinsParamsSchema);
 export const validateSkillsInstallParams =
@@ -409,6 +426,10 @@ export {
   AgentsListParamsSchema,
   AgentsListResultSchema,
   ModelsListParamsSchema,
+  ModelsAuthApiKeySetParamsSchema,
+  ModelsAuthApiKeySetResultSchema,
+  ModelsAuthListParamsSchema,
+  ModelsAuthOAuthStartParamsSchema,
   SkillsStatusParamsSchema,
   SkillsInstallParamsSchema,
   SkillsUpdateParamsSchema,

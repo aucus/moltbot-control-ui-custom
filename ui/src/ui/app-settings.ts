@@ -8,6 +8,7 @@ import { loadNodes } from "./controllers/nodes";
 import { loadExecApprovals } from "./controllers/exec-approvals";
 import { loadPresence } from "./controllers/presence";
 import { loadSessions } from "./controllers/sessions";
+import { loadProviders } from "./controllers/providers";
 import { loadSkills } from "./controllers/skills";
 import { inferBasePathFromPathname, normalizeBasePath, normalizePath, pathForTab, tabFromPath, type Tab } from "./navigation";
 import { saveSettings, type UiSettings } from "./storage";
@@ -146,6 +147,16 @@ export async function refreshActiveTab(host: SettingsHost) {
   if (host.tab === "channels") await loadChannelsTab(host);
   if (host.tab === "instances") await loadPresence(host as unknown as ClawdbotApp);
   if (host.tab === "sessions") await loadSessions(host as unknown as ClawdbotApp);
+  if (host.tab === "providers") {
+    await loadProviders(host as unknown as ClawdbotApp);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const oauth = params.get("oauth");
+      const app = host as unknown as ClawdbotApp;
+      if (oauth === "success") app.providersOauthSuccess = true;
+      if (oauth === "error") app.providersOauthError = params.get("message") ?? "OAuth failed";
+    }
+  }
   if (host.tab === "cron") await loadCron(host);
   if (host.tab === "skills") await loadSkills(host as unknown as ClawdbotApp);
   if (host.tab === "nodes") {

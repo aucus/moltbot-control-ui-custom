@@ -1,6 +1,11 @@
 import { emptyPluginConfigSchema } from "clawdbot/plugin-sdk";
 
-import { loginGeminiCliOAuth } from "./oauth.js";
+import {
+  buildAuthUrlForRedirect,
+  consumeHeadlessState,
+  exchangeCodeForTokensWithRedirect,
+  loginGeminiCliOAuth,
+} from "./oauth.js";
 
 const PROVIDER_ID = "google-gemini-cli";
 const PROVIDER_LABEL = "Gemini CLI OAuth";
@@ -81,6 +86,51 @@ const geminiCliPlugin = {
               );
               throw err;
             }
+          },
+          oauthStart: async (ctx) => {
+            const { url } = buildAuthUrlForRedirect(ctx.redirectUri, ctx.state);
+            return { url };
+          },
+          oauthCallback: async (ctx) => {
+            const verifier = consumeHeadlessState(ctx.state);
+            if (!verifier) {
+              throw new Error("Invalid or expired OAuth state");
+            }
+            const result = await exchangeCodeForTokensWithRedirect(
+              ctx.code,
+              verifier,
+              ctx.redirectUri,
+            );
+            const profileId = `google-gemini-cli:${result.email ?? "default"}`;
+            return {
+              profiles: [
+                {
+                  profileId,
+                  credential: {
+                    type: "oauth",
+                    provider: PROVIDER_ID,
+                    access: result.access,
+                    refresh: result.refresh,
+                    expires: result.expires,
+                    email: result.email,
+                    projectId: result.projectId,
+                  },
+                },
+              ],
+              configPatch: {
+                agents: {
+                  defaults: {
+                    models: {
+                      [DEFAULT_MODEL]: {},
+                    },
+                  },
+                },
+              },
+              defaultModel: DEFAULT_MODEL,
+              notes: [
+                "If requests fail, set GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID.",
+              ],
+            };
           },
         },
       ],

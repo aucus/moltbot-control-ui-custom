@@ -78,6 +78,12 @@ import {
 } from "./app-channels";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity";
+import type { ProvidersListResult } from "./controllers/providers";
+import {
+  loadProviders as loadProvidersInternal,
+  saveApiKey as saveApiKeyInternal,
+  startOAuth as startOAuthInternal,
+} from "./controllers/providers";
 
 declare global {
   interface Window {
@@ -206,6 +212,14 @@ export class ClawdbotApp extends LitElement {
   @state() sessionsFilterLimit = "120";
   @state() sessionsIncludeGlobal = true;
   @state() sessionsIncludeUnknown = false;
+
+  @state() providersLoading = false;
+  @state() providersList: ProvidersListResult | null = null;
+  @state() providersError: string | null = null;
+  @state() oauthStarting: string | null = null;
+  @state() apiKeySaving: string | null = null;
+  @state() providersOauthSuccess: boolean | null = null;
+  @state() providersOauthError: string | null = null;
 
   @state() cronLoading = false;
   @state() cronJobs: CronJob[] = [];
@@ -497,6 +511,50 @@ export class ClawdbotApp extends LitElement {
 
   handleActivityLockChange(locked: boolean) {
     this.activityScrollLocked = locked;
+  }
+
+  async loadProviders() {
+    await loadProvidersInternal(this as unknown as Parameters<typeof loadProvidersInternal>[0]);
+  }
+
+  async handleOAuthStart(providerId: string, methodId?: string) {
+    const result = await startOAuthInternal(
+      this as unknown as Parameters<typeof startOAuthInternal>[0],
+      providerId,
+      methodId,
+    );
+    if (result?.url) {
+      window.open(result.url, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  handleDismissOAuthResult() {
+    this.providersOauthSuccess = null;
+    this.providersOauthError = null;
+    if (typeof window !== "undefined" && window.history.replaceState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("oauth");
+      url.searchParams.delete("message");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }
+
+  async handleApiKeySave(providerId: string, apiKey: string, methodId?: string) {
+    this.apiKeySaving = providerId;
+    this.providersError = null;
+    const ok = await saveApiKeyInternal(
+      this as unknown as Parameters<typeof saveApiKeyInternal>[0],
+      providerId,
+      apiKey,
+      methodId,
+    );
+    this.apiKeySaving = null;
+    if (ok) {
+      this.providersOauthSuccess = true;
+      void this.loadProviders();
+    } else {
+      this.providersOauthError = this.providersError ?? "Failed to save API key.";
+    }
   }
 
   render() {

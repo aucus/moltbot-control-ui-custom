@@ -27,6 +27,7 @@ import {
   resolveHookDeliver,
 } from "./hooks.js";
 import { applyHookMappings } from "./hooks-mapping.js";
+import { handleAuthCallbackRequest } from "./auth-callback.js";
 import { handleOpenAiHttpRequest } from "./openai-http.js";
 import { handleOpenResponsesHttpRequest } from "./openresponses-http.js";
 import { handleToolsInvokeHttpRequest } from "./tools-invoke-http.js";
@@ -238,6 +239,12 @@ export function createGatewayHttpServer(opts: {
     try {
       const configSnapshot = loadConfig();
       const trustedProxies = configSnapshot.gateway?.trustedProxies ?? [];
+      if (
+        await handleAuthCallbackRequest(req, res, {
+          controlUiBasePath,
+        })
+      )
+        return;
       if (await handleHooksRequest(req, res)) return;
       if (
         await handleToolsInvokeHttpRequest(req, res, {

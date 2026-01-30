@@ -61,10 +61,16 @@ export const DEFAULT_GATEWAY_PORT = 18789;
 
 /**
  * Gateway lock directory (ephemeral).
+ * Can be overridden via CLAWDBOT_GATEWAY_LOCK_DIR (e.g. to run a second gateway for Mac app).
  * Default: os.tmpdir()/clawdbot-<uid> (uid suffix when available).
  */
-export function resolveGatewayLockDir(tmpdir: () => string = os.tmpdir): string {
-  const base = tmpdir();
+export function resolveGatewayLockDir(
+  tmpdir: (() => string) | undefined = os.tmpdir,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const override = env.CLAWDBOT_GATEWAY_LOCK_DIR?.trim();
+  if (override) return path.resolve(override);
+  const base = (tmpdir ?? os.tmpdir)();
   const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
   const suffix = uid != null ? `clawdbot-${uid}` : "clawdbot";
   return path.join(base, suffix);

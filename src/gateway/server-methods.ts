@@ -57,6 +57,7 @@ const READ_METHODS = new Set([
   "tts.status",
   "tts.providers",
   "models.list",
+  "models.auth.list",
   "agents.list",
   "agent.identity.get",
   "skills.status",
@@ -86,6 +87,8 @@ const WRITE_METHODS = new Set([
   "node.invoke",
   "chat.send",
   "chat.abort",
+  "models.auth.oauthStart",
+  "models.auth.apiKeySet",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {

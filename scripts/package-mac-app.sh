@@ -255,6 +255,12 @@ fi
 echo "⏹  Stopping any running Clawdbot"
 killall -q Clawdbot 2>/dev/null || true
 
+# 서명 인증서가 없으면 ad-hoc 서명 허용(로컬 사용 가능, TCC 권한은 빌드마다 초기화됨)
+has_identity=$(security find-identity -p codesigning -v 2>/dev/null | grep -c "Apple Development\|Developer ID Application\|Apple Distribution" || true)
+if [[ -z "${SIGN_IDENTITY:-}" ]] && [[ "${has_identity:-0}" -eq 0 ]]; then
+  export ALLOW_ADHOC_SIGNING=1
+fi
+
 echo "🔏 Signing bundle (auto-selects signing identity if SIGN_IDENTITY is unset)"
 "$ROOT_DIR/scripts/codesign-mac-app.sh" "$APP_ROOT"
 

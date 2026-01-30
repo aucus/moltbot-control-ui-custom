@@ -105,12 +105,35 @@ export type ProviderAuthContext = {
   };
 };
 
+/** Optional: start OAuth from Control UI (headless). Gateway passes state and redirectUri; plugin returns auth URL. */
+export type OAuthStartContext = {
+  config: ClawdbotConfig;
+  agentDir?: string;
+  workspaceDir?: string;
+  state: string;
+  redirectUri: string;
+};
+
+/** Optional: complete OAuth after redirect. Gateway passes state and code; plugin exchanges and returns profiles. */
+export type OAuthCallbackContext = {
+  config: ClawdbotConfig;
+  agentDir?: string;
+  workspaceDir?: string;
+  state: string;
+  code: string;
+  redirectUri: string;
+};
+
 export type ProviderAuthMethod = {
   id: string;
   label: string;
   hint?: string;
   kind: ProviderAuthKind;
   run: (ctx: ProviderAuthContext) => Promise<ProviderAuthResult>;
+  /** If present, Control UI can start OAuth headless (get URL + state). */
+  oauthStart?: (ctx: OAuthStartContext) => Promise<{ url: string }>;
+  /** If present, Gateway auth callback can complete OAuth (exchange code for tokens). */
+  oauthCallback?: (ctx: OAuthCallbackContext) => Promise<ProviderAuthResult>;
 };
 
 export type ProviderPlugin = {

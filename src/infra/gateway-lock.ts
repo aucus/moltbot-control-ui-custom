@@ -150,7 +150,7 @@ function resolveGatewayLockPath(env: NodeJS.ProcessEnv) {
   const stateDir = resolveStateDir(env);
   const configPath = resolveConfigPath(env, stateDir);
   const hash = createHash("sha1").update(configPath).digest("hex").slice(0, 8);
-  const lockDir = resolveGatewayLockDir();
+  const lockDir = resolveGatewayLockDir(undefined, env);
   const lockPath = path.join(lockDir, `gateway.${hash}.lock`);
   return { lockPath, configPath };
 }
